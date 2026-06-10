@@ -1,7 +1,7 @@
 welcome = 歡迎
 
 welcome-page-message =
-    你好呀～歡迎使用 An Anime Game Launcher
+    你好呀～歡迎使用 A Factory Game Launcher
 
     在開始遊戲之前，程序需要進行準備，並下載預設組件
 

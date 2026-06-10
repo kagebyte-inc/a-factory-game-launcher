@@ -1,17 +1,17 @@
--company-name-1 = mi
--company-name-2 = Ho
--company-name-3 = Yo
+-company-name-1 = gryine
+-company-name-2 = phl
+-company-name-3 = ine
 company-name = {-company-name-1}{-company-name-2}{-company-name-3}
 
--company-alter-name-1 = CO
--company-alter-name-2 = GNOS
--company-alter-name-3 = PHERE
+-company-alter-name-1 = MOUN
+-company-alter-name-2 = TAIN CO
+-company-alter-name-3 = NTOUR
 company-alter-name = {-company-alter-name-1}{-company-alter-name-2}{-company-alter-name-3}
 
--game-name-1 = Gens
--game-name-2 = hin
--game-name-3 = Imp
--game-name-4 = act
+-game-name-1 = Ark
+-game-name-2 = nights
+-game-name-3 = End
+-game-name-4 = field
 game-name = {-game-name-1}{-game-name-2} {-game-name-3}{-game-name-4}
 
 en-us = English

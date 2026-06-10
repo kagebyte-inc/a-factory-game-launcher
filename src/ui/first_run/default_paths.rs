@@ -22,7 +22,7 @@ pub struct DefaultPathsApp {
     game_china: PathBuf,
     fps_unlocker: PathBuf,
     components: PathBuf,
-    temp: PathBuf
+    temp: PathBuf,
 }
 
 #[derive(Debug, Clone)]
@@ -35,7 +35,7 @@ pub enum Folders {
     GameChina,
     FpsUnlocker,
     Components,
-    Temp
+    Temp,
 }
 
 #[derive(Debug, Clone)]
@@ -43,7 +43,7 @@ pub enum DefaultPathsAppMsg {
     ToggleShowAdditional,
     ChoosePath(Folders),
     Continue,
-    Exit
+    Exit,
 }
 
 #[relm4::component(async, pub)]
@@ -274,14 +274,18 @@ impl SimpleAsyncComponent for DefaultPathsApp {
         }
     }
 
-    async fn init(_init: Self::Init, root: Self::Root, _sender: AsyncComponentSender<Self>) -> AsyncComponentParts<Self> {
+    async fn init(
+        _init: Self::Init,
+        root: Self::Root,
+        _sender: AsyncComponentSender<Self>,
+    ) -> AsyncComponentParts<Self> {
         let model = Self {
             progress_bar: ProgressBar::builder()
                 .launch(ProgressBarInit {
                     caption: None,
                     display_progress: true,
                     display_fraction: false,
-                    visible: false
+                    visible: false,
                 })
                 .detach(),
 
@@ -297,13 +301,15 @@ impl SimpleAsyncComponent for DefaultPathsApp {
             fps_unlocker: CONFIG.game.enhancements.fps_unlocker.path.clone(),
             components: CONFIG.components.path.clone(),
 
-            temp: CONFIG.launcher.temp.clone()
-                .unwrap_or_else(std::env::temp_dir)
+            temp: CONFIG
+                .launcher
+                .temp
+                .clone()
+                .unwrap_or_else(std::env::temp_dir),
         };
 
         // Set progress bar width
-        model.progress_bar.widget()
-            .set_width_request(400);
+        model.progress_bar.widget().set_width_request(400);
 
         let widgets = view_output!();
 
@@ -312,58 +318,59 @@ impl SimpleAsyncComponent for DefaultPathsApp {
 
     async fn update(&mut self, msg: Self::Input, sender: AsyncComponentSender<Self>) {
         match msg {
-            DefaultPathsAppMsg::ToggleShowAdditional => self.show_additional = !self.show_additional,
+            DefaultPathsAppMsg::ToggleShowAdditional => {
+                self.show_additional = !self.show_additional
+            }
 
             DefaultPathsAppMsg::ChoosePath(folder) => {
                 let result = rfd::AsyncFileDialog::new()
                     .set_directory(&self.launcher)
-                    .pick_folder().await;
+                    .pick_folder()
+                    .await;
 
                 if let Some(result) = result {
                     let result = result.path().to_path_buf();
 
                     match folder {
                         Folders::Launcher => {
-                            self.runners      = result.join("runners");
-                            self.dxvks        = result.join("dxvks");
-                            self.prefix       = result.join("prefix");
-                            self.game_global  = result.join(concat!("Ge", "nshi", "n Imp", "act"));
-                            self.game_china   = result.join(concat!("Yu", "anS", "hen"));
+                            self.runners = result.join("runners");
+                            self.dxvks = result.join("dxvks");
+                            self.prefix = result.join("prefix");
+                            self.game_global = result.join(concat!("Ge", "nshi", "n Imp", "act"));
+                            self.game_china = result.join(concat!("Yu", "anS", "hen"));
                             self.fps_unlocker = result.join("fps-unlocker");
-                            self.components   = result.join("components");
+                            self.components = result.join("components");
 
                             self.temp.clone_from(&result);
 
                             self.launcher = result;
                         }
 
-                        Folders::Runners     => self.runners      = result,
-                        Folders::DXVK        => self.dxvks        = result,
-                        Folders::Prefix      => self.prefix       = result,
-                        Folders::GameGlobal  => self.game_global  = result,
-                        Folders::GameChina   => self.game_china   = result,
+                        Folders::Runners => self.runners = result,
+                        Folders::DXVK => self.dxvks = result,
+                        Folders::Prefix => self.prefix = result,
+                        Folders::GameGlobal => self.game_global = result,
+                        Folders::GameChina => self.game_china = result,
                         Folders::FpsUnlocker => self.fps_unlocker = result,
-                        Folders::Components  => self.components   = result,
-                        Folders::Temp        => self.temp         = result
+                        Folders::Components => self.components = result,
+                        Folders::Temp => self.temp = result,
                     }
                 }
             }
 
             #[allow(unused_must_use)]
-            DefaultPathsAppMsg::Continue => {
-                match self.update_config() {
-                    Ok(_) => {
-                        sender.output(Self::Output::ScrollToSelectVoiceovers);
-                    }
-
-                    Err(err) => {
-                        sender.output(Self::Output::Toast {
-                            title: tr!("config-update-error"),
-                            description: Some(err.to_string())
-                        });
-                    }
+            DefaultPathsAppMsg::Continue => match self.update_config() {
+                Ok(_) => {
+                    sender.output(Self::Output::ScrollToSelectVoiceovers);
                 }
-            }
+
+                Err(err) => {
+                    sender.output(Self::Output::Toast {
+                        title: tr!("config-update-error"),
+                        description: Some(err.to_string()),
+                    });
+                }
+            },
 
             DefaultPathsAppMsg::Exit => {
                 relm4::main_application().quit();
@@ -382,7 +389,12 @@ impl DefaultPathsApp {
         config.game.path.global.clone_from(&self.game_global);
         config.game.path.china.clone_from(&self.game_china);
         config.components.path.clone_from(&self.components);
-        config.game.enhancements.fps_unlocker.path.clone_from(&self.fps_unlocker);
+        config
+            .game
+            .enhancements
+            .fps_unlocker
+            .path
+            .clone_from(&self.fps_unlocker);
 
         config.launcher.temp = Some(self.temp.clone());
 

@@ -21,7 +21,7 @@ use super::main::PreferencesAppMsg;
 struct VoicePackageComponent {
     locale: VoiceLocale,
     installed: bool,
-    sensitive: bool
+    sensitive: bool,
 }
 
 #[relm4::factory(async)]
@@ -73,12 +73,12 @@ impl AsyncFactoryComponent for VoicePackageComponent {
     async fn init_model(
         init: Self::Init,
         _index: &DynamicIndex,
-        _sender: AsyncFactorySender<Self>
+        _sender: AsyncFactorySender<Self>,
     ) -> Self {
         Self {
             locale: init.0,
             installed: init.1,
-            sensitive: true
+            sensitive: true,
         }
     }
 
@@ -97,7 +97,7 @@ pub struct GeneralApp {
     style: LauncherStyle,
     use_video_background: bool,
     background_index: u8,
-    languages: Vec<String>
+    languages: Vec<String>,
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -130,8 +130,8 @@ pub enum GeneralAppMsg {
 
     Toast {
         title: String,
-        description: Option<String>
-    }
+        description: Option<String>,
+    },
 }
 
 #[relm4::component(async, pub)]
@@ -542,7 +542,7 @@ impl SimpleAsyncComponent for GeneralApp {
     async fn init(
         _init: Self::Init,
         root: Self::Root,
-        sender: AsyncComponentSender<Self>
+        sender: AsyncComponentSender<Self>,
     ) -> AsyncComponentParts<Self> {
         tracing::info!("Initializing general settings");
 
@@ -562,7 +562,7 @@ impl SimpleAsyncComponent for GeneralApp {
             languages: SUPPORTED_LANGUAGES
                 .iter()
                 .map(|lang| tr!(format_lang(lang).as_str()))
-                .collect()
+                .collect(),
         };
 
         for package in VoiceLocale::list() {
@@ -572,7 +572,7 @@ impl SimpleAsyncComponent for GeneralApp {
                     .game
                     .voices
                     .iter()
-                    .any(|voice| VoiceLocale::from_str(voice) == Some(*package))
+                    .any(|voice| VoiceLocale::from_str(voice) == Some(*package)),
             ));
         }
 
@@ -581,10 +581,7 @@ impl SimpleAsyncComponent for GeneralApp {
 
         let widgets = view_output!();
 
-        AsyncComponentParts {
-            model,
-            widgets
-        }
+        AsyncComponentParts { model, widgets }
     }
 
     async fn update(&mut self, msg: Self::Input, sender: AsyncComponentSender<Self>) {
@@ -650,7 +647,7 @@ impl SimpleAsyncComponent for GeneralApp {
 
                                     sender.input(GeneralAppMsg::Toast {
                                         title: tr!("voice-package-deletion-error"),
-                                        description: Some(err.to_string())
+                                        description: Some(err.to_string()),
                                     });
                                 }
 
@@ -717,13 +714,13 @@ impl SimpleAsyncComponent for GeneralApp {
                 if style == LauncherStyle::Classic && !KEEP_BACKGROUND_FILE.exists() {
                     if let Err(err) = crate::background::download_background(
                         self.use_video_background,
-                        self.background_index
+                        self.background_index,
                     ) {
                         tracing::error!("Failed to download background picture/video");
 
                         sender.input(GeneralAppMsg::Toast {
                             title: tr!("background-downloading-failed"),
-                            description: Some(err.to_string())
+                            description: Some(err.to_string()),
                         });
 
                         return;
@@ -748,13 +745,13 @@ impl SimpleAsyncComponent for GeneralApp {
                 {
                     if let Err(err) = crate::background::download_background(
                         self.use_video_background,
-                        self.background_index
+                        self.background_index,
                     ) {
                         tracing::error!("Failed to download background picture/video");
 
                         sender.input(GeneralAppMsg::Toast {
                             title: tr!("background-downloading-failed"),
-                            description: Some(err.to_string())
+                            description: Some(err.to_string()),
                         });
 
                         return;
@@ -779,7 +776,7 @@ impl SimpleAsyncComponent for GeneralApp {
                     let result = wine
                         .to_wine(
                             config.components.path,
-                            Some(config.game.wine.builds.join(&wine.name))
+                            Some(config.game.wine.builds.join(&wine.name)),
                         )
                         .with_prefix(config.game.wine.prefix)
                         .with_loader(WineLoader::Current)
@@ -789,7 +786,7 @@ impl SimpleAsyncComponent for GeneralApp {
                     if let Err(err) = result {
                         sender.input(GeneralAppMsg::Toast {
                             title: tr!("wine-run-error", { "executable" = executable.join(" ") }),
-                            description: Some(err.to_string())
+                            description: Some(err.to_string()),
                         });
 
                         tracing::error!("Failed to run {:?} using wine: {err}", executable);
@@ -797,14 +794,8 @@ impl SimpleAsyncComponent for GeneralApp {
                 }
             }
 
-            GeneralAppMsg::Toast {
-                title,
-                description
-            } => {
-                let _ = sender.output(Self::Output::Toast {
-                    title,
-                    description
-                });
+            GeneralAppMsg::Toast { title, description } => {
+                let _ = sender.output(Self::Output::Toast { title, description });
             }
         }
     }

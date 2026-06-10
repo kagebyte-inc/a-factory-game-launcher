@@ -1,0 +1,9 @@
+#!/usr/bin/env xdg-open
+[Desktop Entry]
+Name=A Factory Game Launcher
+Icon=moe.takasaki.a-factory-game-launcher
+Exec=AppRun
+Type=Application
+Categories=Game
+Terminal=false
+Keywords=afgl;factory;game;launcher

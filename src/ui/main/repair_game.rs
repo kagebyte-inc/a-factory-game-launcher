@@ -4,7 +4,7 @@ use relm4::prelude::*;
 use relm4::Sender;
 use anime_launcher_sdk::anime_game_core::reqwest::blocking::Client;
 use anime_launcher_sdk::anime_game_core::sophon::installer::{
-    SophonInstaller, Update as SophonRepairerUpdate
+    SophonInstaller, Update as SophonRepairerUpdate,
 };
 use anime_launcher_sdk::anime_game_core::sophon;
 
@@ -36,7 +36,7 @@ pub fn repair_game(sender: ComponentSender<App>, progress_bar_input: Sender<Prog
                 .main
                 .as_ref()
                 .expect("`None` case would've been caught earlier"),
-            &config.launcher.edition.into()
+            &config.launcher.edition.into(),
         )
         .expect("failed to get game info");
 
@@ -80,7 +80,7 @@ pub fn repair_game(sender: ComponentSender<App>, progress_bar_input: Sender<Prog
                     tracing::error!("Error initializing repairer: {e:?}");
                     sender.input(AppMsg::Toast {
                         title: "Repair error".to_owned(),
-                        description: Some(e.to_string())
+                        description: Some(e.to_string()),
                     });
                     continue;
                 }
@@ -94,10 +94,7 @@ pub fn repair_game(sender: ComponentSender<App>, progress_bar_input: Sender<Prog
             let total_to_repair = &total_files_to_repair;
 
             let updater = |msg: SophonRepairerUpdate| match msg {
-                SophonRepairerUpdate::CheckingFilesProgress {
-                    total,
-                    passed
-                } => {
+                SophonRepairerUpdate::CheckingFilesProgress { total, passed } => {
                     tracing::trace!(passed, total, "Verification progress");
 
                     progress_bar_input.send(ProgressBarMsg::UpdateProgressCounter(passed, total));
@@ -114,19 +111,15 @@ pub fn repair_game(sender: ComponentSender<App>, progress_bar_input: Sender<Prog
 
                     progress_bar_input.send(ProgressBarMsg::UpdateProgressCounter(
                         downloaded_files,
-                        total_to_repair.load(Ordering::Acquire)
+                        total_to_repair.load(Ordering::Acquire),
                     ));
                 }
 
-                SophonRepairerUpdate::CheckingFiles {
-                    ..
-                } => {
+                SophonRepairerUpdate::CheckingFiles { .. } => {
                     tracing::trace!("Verification started");
                 }
 
-                SophonRepairerUpdate::DownloadingStarted {
-                    total_files, ..
-                } => {
+                SophonRepairerUpdate::DownloadingStarted { total_files, .. } => {
                     tracing::trace!("Repairing started");
 
                     total_to_repair.store(total_files, Ordering::Release);
@@ -149,7 +142,7 @@ pub fn repair_game(sender: ComponentSender<App>, progress_bar_input: Sender<Prog
             repairer.install(
                 game_path,
                 config.launcher.repairer.threads as usize,
-                updater
+                updater,
             );
 
             let _ = std::fs::remove_dir_all(repairer.downloading_temp());

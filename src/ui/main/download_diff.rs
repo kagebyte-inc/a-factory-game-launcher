@@ -9,7 +9,7 @@ use super::{App, AppMsg};
 pub fn download_diff(
     sender: ComponentSender<App>,
     progress_bar_input: Sender<ProgressBarMsg>,
-    mut diff: VersionDiff
+    mut diff: VersionDiff,
 ) {
     sender.input(AppMsg::SetDownloading(true));
 
@@ -26,7 +26,7 @@ pub fn download_diff(
                 tracing::error!(?err, "Failed to create game directory");
                 sender.input(AppMsg::Toast {
                     title: tr!("downloading-failed"),
-                    description: Some(err.to_string())
+                    description: Some(err.to_string()),
                 });
             }
         }
@@ -48,7 +48,7 @@ pub fn download_diff(
 
                             sender.input(AppMsg::Toast {
                                 title: tr!("downloading-failed"),
-                                description: Some(err.to_string())
+                                description: Some(err.to_string()),
                             });
                         }
 
@@ -57,11 +57,11 @@ pub fn download_diff(
 
                             sender.input(AppMsg::Toast {
                                 title: tr!("unpacking-failed"),
-                                description: Some(err.clone())
+                                description: Some(err.clone()),
                             });
                         }
 
-                        _ => ()
+                        _ => (),
                     }
 
                     #[allow(unused_must_use)]
@@ -69,7 +69,7 @@ pub fn download_diff(
                         progress_bar_input.send(ProgressBarMsg::UpdateFromState(state));
                     }
                 }
-            )
+            ),
         );
 
         let mut perform_on_download_needed = true;
@@ -79,7 +79,7 @@ pub fn download_diff(
 
             sender.input(AppMsg::Toast {
                 title: tr!("downloading-failed"),
-                description: Some(err.to_string())
+                description: Some(err.to_string()),
             });
 
             // Don't try to download something after state updating
@@ -90,7 +90,7 @@ pub fn download_diff(
         sender.input(AppMsg::SetDownloading(false));
         sender.input(AppMsg::UpdateLauncherState {
             perform_on_download_needed,
-            show_status_page: false
+            show_status_page: false,
         });
     });
 }

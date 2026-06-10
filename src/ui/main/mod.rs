@@ -8,6 +8,7 @@ mod download_wine;
 mod install_dxvk;
 mod create_prefix;
 mod download_diff;
+mod download_factory_game;
 mod migrate_folder;
 mod disable_telemetry;
 mod launch;
@@ -48,11 +49,12 @@ pub struct App {
     use_video_background: bool,
     background_index: u8,
     state: Option<LauncherState>,
+    debug_log: String,
 
     downloading: bool,
     disabled_buttons: bool,
     kill_game_button: bool,
-    disabled_kill_game_button: bool
+    disabled_kill_game_button: bool,
 }
 
 #[derive(Debug)]
@@ -63,7 +65,7 @@ pub enum AppMsg {
         perform_on_download_needed: bool,
 
         /// Show status gathering progress page
-        show_status_page: bool
+        show_status_page: bool,
     },
 
     /// Supposed to be called automatically on app's run when the latest game
@@ -80,6 +82,8 @@ pub enum AppMsg {
     SetLoadingStatus(Option<Option<String>>),
 
     SetDownloading(bool),
+    ClearDebugLog,
+    AppendDebugLog(String),
     DisableButtons(bool),
     SetKillGameButton(bool),
     DisableKillGameButton(bool),
@@ -98,10 +102,10 @@ pub enum AppMsg {
 
     Toast {
         title: String,
-        description: Option<String>
+        description: Option<String>,
     },
 
-    SuggestTimeoutFix
+    SuggestTimeoutFix,
 }
 
 #[relm4::component(pub)]
@@ -213,7 +217,7 @@ impl SimpleComponent for App {
                             set_title_widget = &adw::WindowTitle {
                                 #[watch]
                                 set_title: match model.style {
-                                    LauncherStyle::Modern => "An Anime Game Launcher",
+                                    LauncherStyle::Modern => "A Factory Game Launcher",
                                     LauncherStyle::Classic => ""
                                 }
                             },
@@ -256,7 +260,7 @@ impl SimpleComponent for App {
                                 },
 
                                 gtk::Label {
-                                    set_label: "An Anime Game Launcher",
+                                    set_label: "A Factory Game Launcher",
                                     set_margin_top: 32,
                                     add_css_class: "title-1"
                                 }
@@ -283,6 +287,33 @@ impl SimpleComponent for App {
                                 set_margin_bottom: 48,
 
                                 add = model.progress_bar.widget(),
+
+                                gtk::Expander {
+                                    set_label: Some("Debug log"),
+                                    set_margin_top: 16,
+                                    set_width_request: 640,
+
+                                    #[watch]
+                                    set_visible: model.downloading && !model.debug_log.is_empty(),
+
+                                    gtk::ScrolledWindow {
+                                        set_min_content_height: 140,
+                                        set_max_content_height: 220,
+                                        set_policy: (gtk::PolicyType::Automatic, gtk::PolicyType::Automatic),
+
+                                        gtk::Label {
+                                            add_css_class: "monospace",
+                                            set_wrap: true,
+                                            set_wrap_mode: gtk::pango::WrapMode::Char,
+                                            set_xalign: 0.0,
+                                            set_yalign: 0.0,
+                                            set_selectable: true,
+
+                                            #[watch]
+                                            set_label: &model.debug_log
+                                        }
+                                    }
+                                },
                             },
 
                             add = &adw::PreferencesGroup {
@@ -711,7 +742,7 @@ impl SimpleComponent for App {
     fn init(
         _init: Self::Init,
         root: Self::Root,
-        sender: ComponentSender<Self>
+        sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         tracing::info!("Initializing main window");
 
@@ -721,7 +752,7 @@ impl SimpleComponent for App {
                     caption: None,
                     display_progress: true,
                     display_fraction: true,
-                    visible: true
+                    visible: true,
                 })
                 .detach(),
 
@@ -732,11 +763,12 @@ impl SimpleComponent for App {
             use_video_background: CONFIG.launcher.video_background,
             background_index: CONFIG.launcher.background_index,
             state: None,
+            debug_log: String::new(),
 
             downloading: false,
             disabled_buttons: false,
             kill_game_button: false,
-            disabled_kill_game_button: false
+            disabled_kill_game_button: false,
         };
 
         model.progress_bar.widget().set_halign(gtk::Align::Center);
@@ -750,7 +782,7 @@ impl SimpleComponent for App {
         {
             let drop_target = gtk::DropTarget::new(
                 gtk::gdk::FileList::static_type(),
-                gtk::gdk::DragAction::COPY
+                gtk::gdk::DragAction::COPY,
             );
             drop_target.connect_drop(clone!(
                 #[strong]
@@ -776,7 +808,7 @@ impl SimpleComponent for App {
             PREFERENCES_WINDOW = Some(
                 PreferencesApp::builder()
                     .launch(widgets.main_window.clone().into())
-                    .forward(sender.input_sender(), std::convert::identity)
+                    .forward(sender.input_sender(), std::convert::identity),
             );
         }
 
@@ -791,7 +823,7 @@ impl SimpleComponent for App {
                 if let Err(err) = open::that(LAUNCHER_FOLDER.as_path()) {
                     sender.input(AppMsg::Toast {
                         title: tr!("launcher-folder-opening-error"),
-                        description: Some(err.to_string())
+                        description: Some(err.to_string()),
                     });
 
                     tracing::error!("Failed to open launcher folder: {err}");
@@ -813,13 +845,13 @@ impl SimpleComponent for App {
                         .game
                         .path
                         .for_edition(CONFIG.launcher.edition)
-                        .to_path_buf()
+                        .to_path_buf(),
                 };
 
                 if let Err(err) = open::that(path) {
                     sender.input(AppMsg::Toast {
                         title: tr!("game-folder-opening-error"),
-                        description: Some(err.to_string())
+                        description: Some(err.to_string()),
                     });
 
                     tracing::error!("Failed to open game folder: {err}");
@@ -835,7 +867,7 @@ impl SimpleComponent for App {
                     if let Err(err) = open::that(file) {
                         sender.input(AppMsg::Toast {
                             title: tr!("config-file-opening-error"),
-                            description: Some(err.to_string())
+                            description: Some(err.to_string()),
                         });
 
                         tracing::error!("Failed to open config file: {err}");
@@ -851,7 +883,7 @@ impl SimpleComponent for App {
                 if let Err(err) = open::that(crate::DEBUG_FILE.as_os_str()) {
                     sender.input(AppMsg::Toast {
                         title: tr!("debug-file-opening-error"),
-                        description: Some(err.to_string())
+                        description: Some(err.to_string()),
                     });
 
                     tracing::error!("Failed to open debug file: {err}");
@@ -920,7 +952,7 @@ impl SimpleComponent for App {
 
                                             sender.input(AppMsg::Toast {
                                                 title: tr!("wish-url-opening-error"),
-                                                description: Some(err.to_string())
+                                                description: Some(err.to_string()),
                                             });
                                         }
                                     } else {
@@ -928,7 +960,7 @@ impl SimpleComponent for App {
 
                                         sender.input(AppMsg::Toast {
                                             title: tr!("wish-url-search-failed"),
-                                            description: None
+                                            description: None,
                                         });
                                     }
                                 }
@@ -940,7 +972,7 @@ impl SimpleComponent for App {
 
                                     sender.input(AppMsg::Toast {
                                         title: tr!("wish-url-search-failed"),
-                                        description: Some(err.to_string())
+                                        description: Some(err.to_string()),
                                     });
                                 }
                             }
@@ -949,7 +981,7 @@ impl SimpleComponent for App {
 
                             sender.input(AppMsg::Toast {
                                 title: tr!("wish-url-search-failed"),
-                                description: None
+                                description: None,
                             });
                         }
                     }
@@ -993,13 +1025,13 @@ impl SimpleComponent for App {
                     move || {
                         if let Err(err) = crate::background::download_background(
                             model.use_video_background,
-                            model.background_index
+                            model.background_index,
                         ) {
                             tracing::error!("Failed to download background picture: {err}");
 
                             sender.input(AppMsg::Toast {
                                 title: tr!("background-downloading-failed"),
-                                description: Some(err.to_string())
+                                description: Some(err.to_string()),
                             });
                         }
                     }
@@ -1031,9 +1063,9 @@ impl SimpleComponent for App {
                                                         .into_iter()
                                                         .map(|line| format!("- {line}"))
                                                         .collect::<Vec<_>>()
-                                                        .join("\n")
+                                                        .join("\n"),
                                                 )
-                                            }
+                                            },
                                         });
 
                                         break;
@@ -1044,7 +1076,7 @@ impl SimpleComponent for App {
 
                                         sender.input(AppMsg::Toast {
                                             title: tr!("components-index-sync-failed"),
-                                            description: Some(err.to_string())
+                                            description: Some(err.to_string()),
                                         });
                                     }
                                 }
@@ -1056,7 +1088,7 @@ impl SimpleComponent for App {
 
                             sender.input(AppMsg::Toast {
                                 title: tr!("components-index-verify-failed"),
-                                description: Some(err.to_string())
+                                description: Some(err.to_string()),
                             });
                         }
                     }
@@ -1076,7 +1108,7 @@ impl SimpleComponent for App {
 
                             sender.input(AppMsg::Toast {
                                 title: tr!("game-diff-finding-error"),
-                                description: Some(err.to_string())
+                                description: Some(err.to_string()),
                             });
 
                             None
@@ -1095,7 +1127,7 @@ impl SimpleComponent for App {
             // Update launcher state
             sender.input(AppMsg::UpdateLauncherState {
                 perform_on_download_needed: false,
-                show_status_page: true
+                show_status_page: true,
             });
 
             // Mark app as loaded
@@ -1104,10 +1136,7 @@ impl SimpleComponent for App {
             tracing::info!("App is ready");
         });
 
-        ComponentParts {
-            model,
-            widgets
-        }
+        ComponentParts { model, widgets }
     }
 
     fn update(&mut self, msg: Self::Input, sender: ComponentSender<Self>) {
@@ -1117,7 +1146,7 @@ impl SimpleComponent for App {
             // TODO: make function from this message like with toast
             AppMsg::UpdateLauncherState {
                 perform_on_download_needed,
-                show_status_page
+                show_status_page,
             } => {
                 if show_status_page {
                     sender.input(AppMsg::SetLoadingStatus(Some(Some(tr!(
@@ -1159,7 +1188,24 @@ impl SimpleComponent for App {
 
                         None
                     }
-                };
+                }
+                .map(|state| {
+                    if !crate::factory_game::is_installed() {
+                        return state;
+                    }
+
+                    match state {
+                        LauncherState::PredownloadAvailable { .. }
+                        | LauncherState::VoiceUpdateAvailable(_)
+                        | LauncherState::VoiceOutdated(_)
+                        | LauncherState::VoiceNotInstalled(_)
+                        | LauncherState::GameUpdateAvailable(_)
+                        | LauncherState::GameOutdated(_)
+                        | LauncherState::GameNotInstalled(_) => LauncherState::Launch,
+
+                        state => state,
+                    }
+                });
 
                 sender.input(AppMsg::SetLauncherState(state.clone()));
 
@@ -1180,7 +1226,7 @@ impl SimpleComponent for App {
                             sender.input(AppMsg::PerformAction);
                         }
 
-                        _ => ()
+                        _ => (),
                     }
                 }
             }
@@ -1220,6 +1266,26 @@ impl SimpleComponent for App {
                 self.downloading = state;
             }
 
+            AppMsg::ClearDebugLog => {
+                self.debug_log.clear();
+            }
+
+            AppMsg::AppendDebugLog(line) => {
+                if self.debug_log.len() > 16 * 1024 {
+                    let keep_from = self
+                        .debug_log
+                        .char_indices()
+                        .nth(self.debug_log.chars().count().saturating_sub(12 * 1024))
+                        .map(|(index, _)| index)
+                        .unwrap_or(0);
+
+                    self.debug_log = self.debug_log[keep_from..].to_string();
+                }
+
+                self.debug_log.push_str(&line);
+                self.debug_log.push('\n');
+            }
+
             AppMsg::DisableButtons(state) => {
                 self.disabled_buttons = state;
             }
@@ -1256,7 +1322,7 @@ impl SimpleComponent for App {
 
                         sender.input(AppMsg::Toast {
                             title: tr!("wine-prefix-update-failed"),
-                            description: Some(err.to_string())
+                            description: Some(err.to_string()),
                         });
 
                         return;
@@ -1265,16 +1331,14 @@ impl SimpleComponent for App {
 
                 sender.input(AppMsg::UpdateLauncherState {
                     perform_on_download_needed: false,
-                    show_status_page: true
+                    show_status_page: true,
                 });
             }
 
             #[allow(unused_must_use)]
             AppMsg::PredownloadUpdate => {
-                if let Some(LauncherState::PredownloadAvailable {
-                    game,
-                    mut voices
-                }) = self.state.clone()
+                if let Some(LauncherState::PredownloadAvailable { game, mut voices }) =
+                    self.state.clone()
                 {
                     let tmp = Config::get()
                         .unwrap()
@@ -1306,13 +1370,13 @@ impl SimpleComponent for App {
                                         progress_bar_input
                                             .send(ProgressBarMsg::UpdateProgress(curr, total));
                                     }
-                                )
+                                ),
                             );
 
                             if let Err(err) = result {
                                 sender.input(AppMsg::Toast {
                                     title: tr!("downloading-failed"),
-                                    description: Some(err.to_string())
+                                    description: Some(err.to_string()),
                                 });
 
                                 tracing::error!("Failed to predownload update: {err}");
@@ -1324,7 +1388,7 @@ impl SimpleComponent for App {
                         sender.input(AppMsg::SetDownloading(false));
                         sender.input(AppMsg::UpdateLauncherState {
                             perform_on_download_needed: false,
-                            show_status_page: true
+                            show_status_page: true,
                         });
                     });
                 }
@@ -1332,20 +1396,19 @@ impl SimpleComponent for App {
 
             AppMsg::PerformAction => unsafe {
                 match self.state.as_ref().unwrap_unchecked() {
-                    LauncherState::PredownloadAvailable {
-                        ..
+                    LauncherState::PredownloadAvailable { .. } | LauncherState::Launch => {
+                        launch::launch(sender)
                     }
-                    | LauncherState::Launch => launch::launch(sender),
 
                     LauncherState::FolderMigrationRequired {
                         from,
                         to,
-                        cleanup_folder
+                        cleanup_folder,
                     } => migrate_folder::migrate_folder(
                         sender,
                         from.to_owned(),
                         to.to_owned(),
-                        cleanup_folder.to_owned()
+                        cleanup_folder.to_owned(),
                     ),
 
                     LauncherState::TelemetryNotDisabled => {
@@ -1360,16 +1423,21 @@ impl SimpleComponent for App {
                         install_dxvk::install_dxvk(sender, self.progress_bar.sender().to_owned())
                     }
 
-                    LauncherState::GameUpdateAvailable(diff)
-                    | LauncherState::GameNotInstalled(diff)
-                    | LauncherState::VoiceUpdateAvailable(diff)
+                    LauncherState::GameUpdateAvailable(_) | LauncherState::GameNotInstalled(_) => {
+                        download_factory_game::download_factory_game(
+                            sender,
+                            self.progress_bar.sender().to_owned(),
+                        )
+                    }
+
+                    LauncherState::VoiceUpdateAvailable(diff)
                     | LauncherState::VoiceNotInstalled(diff) => download_diff::download_diff(
                         sender,
                         self.progress_bar.sender().to_owned(),
-                        diff.to_owned()
+                        diff.to_owned(),
                     ),
 
-                    LauncherState::GameOutdated(_) | LauncherState::VoiceOutdated(_) => ()
+                    LauncherState::GameOutdated(_) | LauncherState::VoiceOutdated(_) => (),
                 }
             },
 
@@ -1409,12 +1477,9 @@ impl SimpleComponent for App {
                 }
             },
 
-            AppMsg::Toast {
-                title,
-                description
-            } => self.toast(title, description),
+            AppMsg::Toast { title, description } => self.toast(title, description),
 
-            AppMsg::SuggestTimeoutFix => self.suggest_timeout_fix()
+            AppMsg::SuggestTimeoutFix => self.suggest_timeout_fix(),
         }
     }
 }
@@ -1429,7 +1494,7 @@ impl App {
         let dialog = adw::MessageDialog::new(
             Some(window),
             Some(&tr!("timeout-fix-detected")),
-            Some(&tr!("timeout-fix-detected-description"))
+            Some(&tr!("timeout-fix-detected-description")),
         );
 
         dialog.add_response("ignore", &tr!("close"));
@@ -1467,7 +1532,7 @@ impl App {
             let dialog = adw::MessageDialog::new(
                 Some(window),
                 Some(title.as_ref()),
-                Some(description.as_ref())
+                Some(description.as_ref()),
             );
 
             dialog.add_response("close", &tr!("close", { "form" = "noun" }));

@@ -3,6 +3,32 @@
 version = 4
 
 [[package]]
+name = "a-factory-game-launcher"
+version = "3.19.6"
+dependencies = [
+ "anime-launcher-sdk",
+ "anyhow",
+ "cached",
+ "enum-ordinalize",
+ "fluent-templates",
+ "glib-build-tools",
+ "gtk4",
+ "human-panic",
+ "lazy_static",
+ "libadwaita",
+ "md-5",
+ "open",
+ "relm4",
+ "rfd",
+ "serde",
+ "serde_json",
+ "tracing",
+ "tracing-subscriber",
+ "unic-langid",
+ "whatadistro",
+]
+
+[[package]]
 name = "addr2line"
 version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -79,31 +105,6 @@ dependencies = [
  "tracing",
  "xz",
  "zip",
-]
-
-[[package]]
-name = "anime-game-launcher"
-version = "3.19.6"
-dependencies = [
- "anime-launcher-sdk",
- "anyhow",
- "cached",
- "enum-ordinalize",
- "fluent-templates",
- "glib-build-tools",
- "gtk4",
- "human-panic",
- "lazy_static",
- "libadwaita",
- "md-5",
- "open",
- "relm4",
- "rfd",
- "serde_json",
- "tracing",
- "tracing-subscriber",
- "unic-langid",
- "whatadistro",
 ]
 
 [[package]]

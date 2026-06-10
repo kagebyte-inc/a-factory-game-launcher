@@ -23,17 +23,18 @@ impl SimpleComponent for AboutDialog {
 
     view! {
         dialog = adw::AboutDialog {
-            set_application_name: "An Anime Game Launcher",
+            set_application_name: "A Factory Game Launcher",
             set_application_icon: APP_ID,
 
-            set_website: "https://github.com/an-anime-team/an-anime-game-launcher",
-            set_issue_url: "https://github.com/an-anime-team/an-anime-game-launcher/issues",
+            set_website: "https://github.com/kagebyte-inc/a-factory-game-launcher",
+            set_issue_url: "https://github.com/kagebyte-inc/a-factory-game-launcher/issues",
 
             set_license_type: gtk::License::Gpl30Only,
             set_version: &APP_VERSION,
 
             set_developers: &[
                 "Nikita Podvirnyi https://github.com/krypt0nn",
+                "A-K. Nowicki https://github.com/moe-takasaki",
                 "@JohnTheCoolingFan https://github.com/JohnTheCoolingFan"
             ],
 
@@ -47,8 +48,13 @@ impl SimpleComponent for AboutDialog {
                 "@JohnTheCoolingFan https://github.com/JohnTheCoolingFan"
             ]),
 
+            add_credit_section: (Some("A 影バイト Team"), &[
+               "A-K. Nowicki https://github.com/moe-takasaki",
+               "силента https://github.com/silentaloud"
+            ]),
+
             set_artists: &[
-                "@nightany https://pinterest.com/pin/356206651788051017"
+                "Gryphline https://x.com/NicoOnibot/status/2014283688121356714"
             ],
 
             set_translator_credits: &[
@@ -109,16 +115,13 @@ impl SimpleComponent for AboutDialog {
     fn init(
         _init: Self::Init,
         root: Self::Root,
-        _sender: ComponentSender<Self>
+        _sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         tracing::info!("Initializing about dialog");
 
         let model = Self;
         let widgets = view_output!();
 
-        ComponentParts {
-            model,
-            widgets
-        }
+        ComponentParts { model, widgets }
     }
 }

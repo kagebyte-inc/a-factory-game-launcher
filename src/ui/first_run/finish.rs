@@ -10,7 +10,7 @@ pub struct FinishApp;
 #[derive(Debug, Clone)]
 pub enum FinishAppMsg {
     Restart,
-    Exit
+    Exit,
 }
 
 #[relm4::component(async, pub)]
@@ -68,7 +68,11 @@ impl SimpleAsyncComponent for FinishApp {
         }
     }
 
-    async fn init(_init: Self::Init, root: Self::Root, _sender: AsyncComponentSender<Self>) -> AsyncComponentParts<Self> {
+    async fn init(
+        _init: Self::Init,
+        root: Self::Root,
+        _sender: AsyncComponentSender<Self>,
+    ) -> AsyncComponentParts<Self> {
         let model = Self;
         let widgets = view_output!();
 
@@ -79,12 +83,14 @@ impl SimpleAsyncComponent for FinishApp {
         match msg {
             FinishAppMsg::Restart => {
                 #[allow(clippy::zombie_processes)]
-                std::process::Command::new(std::env::current_exe().unwrap()).spawn().unwrap();
+                std::process::Command::new(std::env::current_exe().unwrap())
+                    .spawn()
+                    .unwrap();
 
                 relm4::main_application().quit();
             }
 
-            FinishAppMsg::Exit => relm4::main_application().quit()
+            FinishAppMsg::Exit => relm4::main_application().quit(),
         }
     }
 }

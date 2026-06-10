@@ -30,7 +30,7 @@ pub struct FirstRunApp {
     carousel: adw::Carousel,
 
     loading: Option<Option<String>>,
-    title: String
+    title: String,
 }
 
 #[derive(Debug, Clone)]
@@ -45,8 +45,8 @@ pub enum FirstRunAppMsg {
 
     Toast {
         title: String,
-        description: Option<String>
-    }
+        description: Option<String>,
+    },
 }
 
 #[relm4::component(pub)]
@@ -115,7 +115,11 @@ impl SimpleComponent for FirstRunApp {
         }
     }
 
-    fn init(_parent: Self::Init, root: Self::Root, sender: ComponentSender<Self>) -> ComponentParts<Self> {
+    fn init(
+        _parent: Self::Init,
+        root: Self::Root,
+        sender: ComponentSender<Self>,
+    ) -> ComponentParts<Self> {
         tracing::info!("Initializing first run window");
 
         let toast_overlay = adw::ToastOverlay::new();
@@ -150,7 +154,7 @@ impl SimpleComponent for FirstRunApp {
             carousel,
 
             loading: None,
-            title: tr!("welcome")
+            title: tr!("welcome"),
         };
 
         let toast_overlay = &model.toast_overlay;
@@ -192,12 +196,15 @@ impl SimpleComponent for FirstRunApp {
             FirstRunAppMsg::ScrollToSelectVoiceovers => {
                 self.title = tr!("select-voice-packages");
 
-                self.carousel.scroll_to(self.select_voiceovers.widget(), true);
+                self.carousel
+                    .scroll_to(self.select_voiceovers.widget(), true);
             }
 
             FirstRunAppMsg::ScrollToDownloadComponents => {
                 // Update components index
-                sender.input(FirstRunAppMsg::SetLoadingStatus(Some(Some(tr!("updating-components-index")))));
+                sender.input(FirstRunAppMsg::SetLoadingStatus(Some(Some(tr!(
+                    "updating-components-index"
+                )))));
 
                 let config = Config::get().unwrap_or_else(|_| CONFIG.clone());
 
@@ -219,7 +226,7 @@ impl SimpleComponent for FirstRunApp {
 
                                         sender.input(FirstRunAppMsg::Toast {
                                             title: tr!("components-index-sync-failed"),
-                                            description: Some(err.to_string())
+                                            description: Some(err.to_string()),
                                         });
                                     }
                                 }
@@ -231,7 +238,7 @@ impl SimpleComponent for FirstRunApp {
 
                             sender.input(FirstRunAppMsg::Toast {
                                 title: tr!("components-index-verify-failed"),
-                                description: Some(err.to_string())
+                                description: Some(err.to_string()),
                             });
                         }
                     }
@@ -247,7 +254,8 @@ impl SimpleComponent for FirstRunApp {
                 // This will happen in background behind StatusPage
                 self.title = tr!("download-components");
 
-                self.carousel.scroll_to(self.download_components.widget(), true);
+                self.carousel
+                    .scroll_to(self.download_components.widget(), true);
             }
 
             FirstRunAppMsg::ScrollToFinish => {
@@ -265,7 +273,11 @@ impl SimpleComponent for FirstRunApp {
                 if let Some(description) = description {
                     toast.set_button_label(Some(&tr!("details")));
 
-                    let dialog = adw::MessageDialog::new(MAIN_WINDOW.as_ref(), Some(&title), Some(&description));
+                    let dialog = adw::MessageDialog::new(
+                        MAIN_WINDOW.as_ref(),
+                        Some(&title),
+                        Some(&description),
+                    );
 
                     dialog.add_response("close", &tr!("close", { "form" = "noun" }));
                     dialog.add_response("save", &tr!("save"));
@@ -284,7 +296,7 @@ impl SimpleComponent for FirstRunApp {
                 }
 
                 self.toast_overlay.add_toast(toast);
-            }
+            },
         }
     }
 }

@@ -27,7 +27,7 @@ pub struct EnhancementsApp {
     game_page: AsyncController<GamePage>,
     sandbox_page: AsyncController<SandboxPage>,
     environment_page: AsyncController<EnvironmentPage>,
-    timeout_fix: bool
+    timeout_fix: bool,
 }
 
 #[derive(Debug)]
@@ -43,8 +43,8 @@ pub enum EnhancementsAppMsg {
 
     Toast {
         title: String,
-        description: Option<String>
-    }
+        description: Option<String>,
+    },
 }
 
 #[relm4::component(async, pub)]
@@ -567,9 +567,7 @@ impl SimpleAsyncComponent for EnhancementsApp {
         tracing::info!("Initializing enhancements settings");
 
         let model = Self {
-            gamescope: GamescopeApp::builder()
-                .launch(())
-                .detach(),
+            gamescope: GamescopeApp::builder().launch(()).detach(),
 
             game_page: GamePage::builder()
                 .launch(())
@@ -583,7 +581,7 @@ impl SimpleAsyncComponent for EnhancementsApp {
                 .launch(())
                 .forward(sender.input_sender(), std::convert::identity),
 
-            timeout_fix: CONFIG.game.wine.timeout_fix
+            timeout_fix: CONFIG.game.wine.timeout_fix,
         };
 
         let game_page = model.game_page.widget();
@@ -593,7 +591,9 @@ impl SimpleAsyncComponent for EnhancementsApp {
         let widgets = view_output!();
 
         if !is_wayland_available() {
-            widgets.winewayland_row.set_tooltip_text(Some(&tr!("winewayland-unavailable-tooltip")));
+            widgets
+                .winewayland_row
+                .set_tooltip_text(Some(&tr!("winewayland-unavailable-tooltip")));
         }
 
         AsyncComponentParts { model, widgets }
@@ -604,50 +604,55 @@ impl SimpleAsyncComponent for EnhancementsApp {
         #[allow(static_mut_refs)]
         match msg {
             EnhancementsAppMsg::SetGamescopeParent => unsafe {
-                self.gamescope.widget().set_transient_for(super::main::PREFERENCES_WINDOW.as_ref());
-            }
+                self.gamescope
+                    .widget()
+                    .set_transient_for(super::main::PREFERENCES_WINDOW.as_ref());
+            },
 
             EnhancementsAppMsg::OpenGamescope => {
                 self.gamescope.widget().present();
             }
 
             EnhancementsAppMsg::OpenMainPage => unsafe {
-                PREFERENCES_WINDOW.as_ref()
+                PREFERENCES_WINDOW
+                    .as_ref()
                     .unwrap_unchecked()
                     .widget()
                     .pop_subpage();
-            }
+            },
 
             EnhancementsAppMsg::OpenGameSettingsPage => unsafe {
-                PREFERENCES_WINDOW.as_ref()
+                PREFERENCES_WINDOW
+                    .as_ref()
                     .unwrap_unchecked()
                     .widget()
                     .push_subpage(self.game_page.widget());
-            }
+            },
 
             EnhancementsAppMsg::OpenSandboxSettingsPage => unsafe {
-                PREFERENCES_WINDOW.as_ref()
+                PREFERENCES_WINDOW
+                    .as_ref()
                     .unwrap_unchecked()
                     .widget()
                     .push_subpage(self.sandbox_page.widget());
-            }
+            },
 
             EnhancementsAppMsg::OpenEnvironmentSettingsPage => unsafe {
-                PREFERENCES_WINDOW.as_ref()
+                PREFERENCES_WINDOW
+                    .as_ref()
                     .unwrap_unchecked()
                     .widget()
                     .push_subpage(self.environment_page.widget());
-            }
+            },
 
             EnhancementsAppMsg::SetTimeoutFix(value) => {
                 self.timeout_fix = value;
             }
 
             EnhancementsAppMsg::Toast { title, description } => {
-                sender.output(PreferencesAppMsg::Toast {
-                    title,
-                    description
-                }).unwrap();
+                sender
+                    .output(PreferencesAppMsg::Toast { title, description })
+                    .unwrap();
             }
         }
     }

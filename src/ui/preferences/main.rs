@@ -13,7 +13,7 @@ pub static mut PREFERENCES_WINDOW: Option<adw::PreferencesWindow> = None;
 
 pub struct PreferencesApp {
     general: AsyncController<GeneralApp>,
-    enhancements: AsyncController<EnhancementsApp>
+    enhancements: AsyncController<EnhancementsApp>,
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -34,8 +34,8 @@ pub enum PreferencesAppMsg {
 
     Toast {
         title: String,
-        description: Option<String>
-    }
+        description: Option<String>,
+    },
 }
 
 #[relm4::component(async, pub)]
@@ -72,7 +72,7 @@ impl SimpleAsyncComponent for PreferencesApp {
     async fn init(
         parent: Self::Init,
         root: Self::Root,
-        sender: AsyncComponentSender<Self>
+        sender: AsyncComponentSender<Self>,
     ) -> AsyncComponentParts<Self> {
         tracing::info!("Initializing preferences window");
 
@@ -83,7 +83,7 @@ impl SimpleAsyncComponent for PreferencesApp {
 
             enhancements: EnhancementsApp::builder()
                 .launch(())
-                .forward(sender.input_sender(), std::convert::identity)
+                .forward(sender.input_sender(), std::convert::identity),
         };
 
         let widgets = view_output!();
@@ -101,10 +101,7 @@ impl SimpleAsyncComponent for PreferencesApp {
         model.general.emit(GeneralAppMsg::UpdateDownloadedWine);
         model.general.emit(GeneralAppMsg::UpdateDownloadedDxvk);
 
-        AsyncComponentParts {
-            model,
-            widgets
-        }
+        AsyncComponentParts { model, widgets }
     }
 
     async fn update(&mut self, msg: Self::Input, sender: AsyncComponentSender<Self>) {
@@ -132,7 +129,7 @@ impl SimpleAsyncComponent for PreferencesApp {
             PreferencesAppMsg::UpdateLauncherState => {
                 let _ = sender.output(Self::Output::UpdateLauncherState {
                     perform_on_download_needed: false,
-                    show_status_page: false
+                    show_status_page: false,
                 });
             }
 
@@ -149,13 +146,11 @@ impl SimpleAsyncComponent for PreferencesApp {
             },
 
             PreferencesAppMsg::SetTimeoutFix(value) => {
-                self.enhancements.emit(EnhancementsAppMsg::SetTimeoutFix(value));
+                self.enhancements
+                    .emit(EnhancementsAppMsg::SetTimeoutFix(value));
             }
 
-            PreferencesAppMsg::Toast {
-                title,
-                description
-            } => unsafe {
+            PreferencesAppMsg::Toast { title, description } => unsafe {
                 let toast = adw::Toast::new(&title);
 
                 toast.set_timeout(4);
@@ -166,7 +161,7 @@ impl SimpleAsyncComponent for PreferencesApp {
                     let dialog = adw::MessageDialog::new(
                         PREFERENCES_WINDOW.as_ref(),
                         Some(&title),
-                        Some(&description)
+                        Some(&description),
                     );
 
                     dialog.add_response("close", &tr!("close", { "form" = "noun" }));
@@ -189,7 +184,7 @@ impl SimpleAsyncComponent for PreferencesApp {
                     .as_ref()
                     .unwrap_unchecked()
                     .add_toast(toast);
-            }
+            },
         }
     }
 }

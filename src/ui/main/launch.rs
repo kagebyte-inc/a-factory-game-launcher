@@ -18,18 +18,18 @@ pub fn launch(sender: ComponentSender<App>) {
         }
 
         // Hide launcher window if behavior set to "Hide" or "Close"
-        LauncherBehavior::Hide | LauncherBehavior::Close => sender.input(AppMsg::HideWindow)
+        LauncherBehavior::Hide | LauncherBehavior::Close => sender.input(AppMsg::HideWindow),
     }
 
     std::thread::spawn(move || {
-        let suggest_timeout_fix = match anime_launcher_sdk::genshin::game::run() {
+        let suggest_timeout_fix = match crate::factory_game::launch() {
             Ok(suggest) => suggest,
             Err(err) => {
                 tracing::error!("Failed to launch game: {err}");
 
                 sender.input(AppMsg::Toast {
                     title: tr!("game-launching-failed"),
-                    description: Some(err.to_string())
+                    description: Some(err.to_string()),
                 });
 
                 false
@@ -61,7 +61,7 @@ pub fn launch(sender: ComponentSender<App>) {
             // (No timeout fix suggestion here since the app is quitting)
             LauncherBehavior::Close => gtk::glib::MainContext::default().invoke(|| {
                 relm4::main_application().quit();
-            })
+            }),
         }
     });
 }

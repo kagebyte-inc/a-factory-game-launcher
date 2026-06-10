@@ -17,7 +17,11 @@ pub fn create_prefix(sender: ComponentSender<App>) {
             sender.input(AppMsg::DisableButtons(true));
 
             std::thread::spawn(move || {
-                let wine = wine.to_wine(config.components.path, Some(config.game.wine.builds.join(&wine.name)))
+                let wine = wine
+                    .to_wine(
+                        config.components.path,
+                        Some(config.game.wine.builds.join(&wine.name)),
+                    )
                     .with_prefix(&config.game.wine.prefix)
                     .with_loader(WineLoader::Current);
 
@@ -26,14 +30,14 @@ pub fn create_prefix(sender: ComponentSender<App>) {
 
                     sender.input(AppMsg::Toast {
                         title: tr!("wine-prefix-update-failed"),
-                        description: Some(err.to_string())
+                        description: Some(err.to_string()),
                     });
                 }
 
                 sender.input(AppMsg::DisableButtons(false));
                 sender.input(AppMsg::UpdateLauncherState {
                     perform_on_download_needed: false,
-                    show_status_page: true
+                    show_status_page: true,
                 });
             });
         }
@@ -43,7 +47,7 @@ pub fn create_prefix(sender: ComponentSender<App>) {
 
             sender.input(AppMsg::Toast {
                 title: tr!("failed-get-selected-wine"),
-                description: None
+                description: None,
             });
         }
 
@@ -52,7 +56,7 @@ pub fn create_prefix(sender: ComponentSender<App>) {
 
             sender.input(AppMsg::Toast {
                 title: tr!("failed-get-selected-wine"),
-                description: Some(err.to_string())
+                description: Some(err.to_string()),
             });
         }
     }

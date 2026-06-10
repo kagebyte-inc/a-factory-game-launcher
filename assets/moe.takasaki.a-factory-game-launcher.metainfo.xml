@@ -1,0 +1,62 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<component type="desktop-application">
+  <id>moe.takasaki.a-factory-game-launcher</id>
+  <name>A Factory Game Launcher</name>
+  <summary>Play your favorite factory game on Linux</summary>
+  <summary xml:lang="de">Spielen Sie Ihr Lieblings-Fabriken-Spiel auf Linux</summary>
+  <summary xml:lang="ru">Играйте в вашу любимую игру с заводами на линуксе</summary>
+  <summary xml:lang="es">Juega a tu juego favorito de fábricas en Linux</summary>
+  <summary xml:lang="it">Gioca al tuo gioco di fabbrica preferito su Linux</summary>
+  <summary xml:lang="hu">Játssz a kedvenc játékoddal Linux-on!</summary>
+  <description>
+    <p>A Factory Game Launcher is an unofficial launcher for your favorite factory game that handles setting up Wine and installing the game on Linux.</p>
+    <p xml:lang="de">A Factory Game Launcher ist ein inoffizieller Launcher für Ihr Lieblings-Fabrikspiel, der die Installation von Wine und des Spiels unter Linux erleichtert.</p>
+    <p xml:lang="ru">A Factory Game Launcher - это неофициальный лаунчер для вашей любимой игры про фабрики, который настраивает Wine и устанавливает игру на линуксе.</p>
+    <p xml:lang="es">A Factory Game Launcher es un launcher no oficial para tu juego de fábricas favorito. Se encarga de configurar Wine e instalar el juego en Linux.</p>
+    <p xml:lang="it">A Factory Game Launcher è un launcher non ufficiale per il tuo gioco di fabbrica preferito che gestisce e configura automaticamente Wine e l'installazione del gioco su Linux.</p>
+    <p xml:lang="hu">A Factory Game Launcher egy nem hivatalos launcher a kedvenc gyárépítős játékodhoz, amely helyetted beállítja a Wine-t és telepíti a játékot Linux-on.</p>
+  </description>
+  <developer id="moe.launcher">
+    <name>Kagebaito works &amp; An Anime Team</name>
+  </developer>
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/an-anime-team/a-factory-game-launcher/5afbfb239d058142cb803d2d0a0fc84cdf084ca2/repository/main-classic.png</image>
+      <caption>Main launcher window (Classic look)</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/an-anime-team/a-factory-game-launcher/5afbfb239d058142cb803d2d0a0fc84cdf084ca2/repository/settings-classic.png</image>
+      <caption>Launcher settings (Classic look)</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/an-anime-team/a-factory-game-launcher/5afbfb239d058142cb803d2d0a0fc84cdf084ca2/repository/main-modern.png</image>
+      <caption>Main launcher window (Modern look)</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/an-anime-team/a-factory-game-launcher/5afbfb239d058142cb803d2d0a0fc84cdf084ca2/repository/settings-modern.png</image>
+      <caption>Launcher settings (Modern look)</caption>
+    </screenshot>
+  </screenshots>
+  <launchable type="desktop-id">moe.takasaki.a-factory-game-launcher.desktop</launchable>
+  <url type="homepage">https://launcher.moe/</url>
+  <url type="donation">https://opencollective.com/dawn-winery</url>
+  <url type="vcs-browser">https://github.com/an-anime-team/a-factory-game-launcher</url>
+  <url type="bugtracker">https://github.com/an-anime-team/a-factory-game-launcher/issues</url>
+  <project_license>GPL-3.0-or-later</project_license>
+  <metadata_license>CC0-1.0</metadata_license>
+  <categories>
+    <category>Game</category>
+  </categories>
+  <content_rating type="oars-1.1" />
+  <releases>
+    <release version="3.19.7" date="2026-06-05">
+      <description>
+        <p>Initial release of the A Factory Game Launcher</p>
+      </description>
+    </release>
+  </releases>
+  <branding>
+    <color type="primary" scheme_preference="light">#ffd9b3</color>
+    <color type="primary" scheme_preference="dark">#2d1a1a</color>
+  </branding>
+</component>

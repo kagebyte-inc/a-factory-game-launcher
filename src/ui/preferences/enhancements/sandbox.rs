@@ -12,7 +12,7 @@ macro_rules! impl_directory {
         #[derive(Debug)]
         struct $name {
             from: String,
-            to: Option<String>
+            to: Option<String>,
         }
 
         #[relm4::factory(async)]
@@ -51,11 +51,11 @@ macro_rules! impl_directory {
             ) -> Self {
                 Self {
                     from: init.0,
-                    to: init.1
+                    to: init.1,
                 }
             }
         }
-    }
+    };
 }
 
 impl_directory!(PrivateDirectory, SandboxPageMsg::RemovePrivate);
@@ -74,7 +74,7 @@ pub struct SandboxPage {
     read_only_switch: gtk::Switch,
 
     symlink_path_from_entry: adw::EntryRow,
-    symlink_path_to_entry: adw::EntryRow
+    symlink_path_to_entry: adw::EntryRow,
 }
 
 #[derive(Debug, Clone)]
@@ -86,7 +86,7 @@ pub enum SandboxPageMsg {
     RemoveShared(DynamicIndex),
 
     AddSymlink,
-    RemoveSymlink(DynamicIndex)
+    RemoveSymlink(DynamicIndex),
 }
 
 #[relm4::component(async, pub)]
@@ -315,7 +315,11 @@ impl SimpleAsyncComponent for SandboxPage {
         }
     }
 
-    async fn init(_init: Self::Init, root: Self::Root, sender: AsyncComponentSender<Self>) -> AsyncComponentParts<Self> {
+    async fn init(
+        _init: Self::Init,
+        root: Self::Root,
+        sender: AsyncComponentSender<Self>,
+    ) -> AsyncComponentParts<Self> {
         tracing::info!("Initializing sandbox settings");
 
         let mut model = Self {
@@ -338,32 +342,35 @@ impl SimpleAsyncComponent for SandboxPage {
             read_only_switch: gtk::Switch::new(),
 
             symlink_path_from_entry: adw::EntryRow::new(),
-            symlink_path_to_entry: adw::EntryRow::new()
+            symlink_path_to_entry: adw::EntryRow::new(),
         };
 
         for path in &CONFIG.sandbox.private {
-            model.private_paths.guard().push_back((path.trim().to_string(), None));
+            model
+                .private_paths
+                .guard()
+                .push_back((path.trim().to_string(), None));
         }
 
         for (from, to) in &CONFIG.sandbox.mounts.read_only {
             model.shared_paths.guard().push_back((
                 from.trim().to_string(),
-                Some(format!("[read-only] {}", to.trim()))
+                Some(format!("[read-only] {}", to.trim())),
             ));
         }
 
         for (from, to) in &CONFIG.sandbox.mounts.bind {
-            model.shared_paths.guard().push_back((
-                from.trim().to_string(),
-                Some(to.trim().to_string())
-            ));
+            model
+                .shared_paths
+                .guard()
+                .push_back((from.trim().to_string(), Some(to.trim().to_string())));
         }
 
         for (from, to) in &CONFIG.sandbox.mounts.symlinks {
-            model.symlink_paths.guard().push_back((
-                from.trim().to_string(),
-                Some(to.trim().to_string())
-            ));
+            model
+                .symlink_paths
+                .guard()
+                .push_back((from.trim().to_string(), Some(to.trim().to_string())));
         }
 
         let private_paths = model.private_paths.widget();
@@ -412,7 +419,7 @@ impl SimpleAsyncComponent for SandboxPage {
 
                     self.private_paths.guard().remove(index.current_index());
                 }
-            },
+            }
 
             SandboxPageMsg::AddShared => {
                 if let Ok(mut config) = Config::get() {
@@ -426,7 +433,11 @@ impl SimpleAsyncComponent for SandboxPage {
                         self.shared_path_to_entry.set_text("");
 
                         if read_only {
-                            config.sandbox.mounts.read_only.insert(from.clone(), to.clone());
+                            config
+                                .sandbox
+                                .mounts
+                                .read_only
+                                .insert(from.clone(), to.clone());
                         } else {
                             config.sandbox.mounts.bind.insert(from.clone(), to.clone());
                         }
@@ -439,7 +450,7 @@ impl SimpleAsyncComponent for SandboxPage {
                                 format!("[read-only] {}", to)
                             } else {
                                 to
-                            })
+                            }),
                         ));
                     }
                 }
@@ -456,7 +467,7 @@ impl SimpleAsyncComponent for SandboxPage {
 
                     self.shared_paths.guard().remove(index.current_index());
                 }
-            },
+            }
 
             SandboxPageMsg::AddSymlink => {
                 if let Ok(mut config) = Config::get() {
@@ -467,7 +478,11 @@ impl SimpleAsyncComponent for SandboxPage {
                         self.symlink_path_from_entry.set_text("");
                         self.symlink_path_to_entry.set_text("");
 
-                        config.sandbox.mounts.symlinks.insert(from.clone(), to.clone());
+                        config
+                            .sandbox
+                            .mounts
+                            .symlinks
+                            .insert(from.clone(), to.clone());
 
                         Config::update(config);
 

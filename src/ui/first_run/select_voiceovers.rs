@@ -12,13 +12,13 @@ pub struct SelectVoiceoversApp {
     english: gtk::Switch,
     japanese: gtk::Switch,
     korean: gtk::Switch,
-    chinese: gtk::Switch
+    chinese: gtk::Switch,
 }
 
 #[derive(Debug, Clone)]
 pub enum SelectVoiceoversAppMsg {
     Continue,
-    Exit
+    Exit,
 }
 
 #[relm4::component(async, pub)]
@@ -86,12 +86,12 @@ impl SimpleAsyncComponent for SelectVoiceoversApp {
             add = &adw::PreferencesGroup {
                 set_valign: gtk::Align::Center,
                 set_vexpand: true,
-    
+
                 gtk::Box {
                     set_orientation: gtk::Orientation::Horizontal,
                     set_halign: gtk::Align::Center,
                     set_spacing: 8,
-    
+
                     gtk::Button {
                         set_label: &tr!("continue"),
                         set_css_classes: &["suggested-action", "pill"],
@@ -110,18 +110,22 @@ impl SimpleAsyncComponent for SelectVoiceoversApp {
         }
     }
 
-    async fn init(_init: Self::Init, root: Self::Root, _sender: AsyncComponentSender<Self>) -> AsyncComponentParts<Self> {
+    async fn init(
+        _init: Self::Init,
+        root: Self::Root,
+        _sender: AsyncComponentSender<Self>,
+    ) -> AsyncComponentParts<Self> {
         let model = Self {
             english: gtk::Switch::new(),
             japanese: gtk::Switch::new(),
             korean: gtk::Switch::new(),
-            chinese: gtk::Switch::new()
+            chinese: gtk::Switch::new(),
         };
 
-        let english  = &model.english;
+        let english = &model.english;
         let japanese = &model.japanese;
-        let korean   = &model.korean;
-        let chinese  = &model.chinese;
+        let korean = &model.korean;
+        let chinese = &model.chinese;
 
         let widgets = view_output!();
 
@@ -134,15 +138,15 @@ impl SimpleAsyncComponent for SelectVoiceoversApp {
             SelectVoiceoversAppMsg::Continue => {
                 match self.update_config() {
                     Ok(_) => sender.output(Self::Output::ScrollToDownloadComponents),
-    
+
                     Err(err) => sender.output(Self::Output::Toast {
                         title: tr!("config-update-error"),
-                        description: Some(err.to_string())
-                    })
+                        description: Some(err.to_string()),
+                    }),
                 };
             }
 
-            SelectVoiceoversAppMsg::Exit => relm4::main_application().quit()
+            SelectVoiceoversAppMsg::Exit => relm4::main_application().quit(),
         }
     }
 }

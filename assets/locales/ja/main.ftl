@@ -14,7 +14,7 @@ game-folder = ゲームフォルダ
 config-file = 設定ファイル
 debug-file = デバッグファイル
 wish-url = 祈願履歴を開く
-about = "An Anime Game launcher"について
+about = "A Factory Game Launcher"について
 
 
 close = { $form ->

@@ -1,11 +1,10 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use relm4::prelude::*;
 use anime_launcher_sdk::config::ConfigExt;
 use anime_launcher_sdk::genshin::config::{Config, Schema};
 use anime_launcher_sdk::genshin::states::LauncherState;
-use anime_launcher_sdk::genshin::consts::*;
 use anime_launcher_sdk::anime_game_core::prelude::*;
 use anime_launcher_sdk::anime_game_core::genshin::prelude::*;
 use anime_launcher_sdk::sessions::SessionsExt;
@@ -16,13 +15,16 @@ use tracing_subscriber::filter::*;
 pub mod move_files;
 pub mod i18n;
 pub mod background;
+pub mod factory_game;
 pub mod ui;
 
 use ui::main::*;
 use ui::first_run::main::*;
 
-pub const APP_ID: &str = "moe.launcher.an-anime-game-launcher";
-pub const APP_RESOURCE_PATH: &str = "/moe/launcher/an-anime-game-launcher";
+pub const APP_ID: &str = "moe.takasaki.a-factory-game-launcher";
+pub const APP_RESOURCE_PATH: &str = "/moe/takasaki/a-factory-game-launcher";
+pub const APP_FOLDER_NAME: &str = "a-factory-game-launcher";
+pub const LEGACY_APP_FOLDER_NAMES: &[&str] = &["a-factory-game-launcher", "anime-game-launcher"];
 
 pub const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const APP_DEBUG: bool = cfg!(debug_assertions);
@@ -48,48 +50,214 @@ pub fn is_wayland_available() -> bool {
         return false;
     };
 
-    std::path::Path::new(&runtime_dir).join("wayland-0").exists()
+    std::path::Path::new(&runtime_dir)
+        .join("wayland-0")
+        .exists()
+}
+
+fn xdg_data_dir(folder_name: &str) -> anyhow::Result<PathBuf> {
+    let path = std::env::var("XDG_DATA_HOME")
+        .map(|data| format!("{data}/{folder_name}"))
+        .or_else(|_| std::env::var("HOME").map(|home| format!("{home}/.local/share/{folder_name}")))
+        .or_else(|_| {
+            std::env::var("USER")
+                .or_else(|_| std::env::var("USERNAME"))
+                .map(|username| format!("/home/{username}/.local/share/{folder_name}"))
+        })
+        .map(PathBuf::from)
+        .or_else(|_| std::env::current_dir().map(|current| current.join("data")))
+        .map_err(|err| anyhow::anyhow!("Failed to find launcher folder: {err}"))?;
+
+    Ok(path.canonicalize().unwrap_or(path))
+}
+
+fn xdg_cache_dir(folder_name: &str) -> anyhow::Result<PathBuf> {
+    let path = std::env::var("XDG_CACHE_HOME")
+        .map(|cache| format!("{cache}/{folder_name}"))
+        .or_else(|_| std::env::var("HOME").map(|home| format!("{home}/.cache/{folder_name}")))
+        .or_else(|_| {
+            std::env::var("USER")
+                .or_else(|_| std::env::var("USERNAME"))
+                .map(|username| format!("/home/{username}/.cache/{folder_name}"))
+        })
+        .map(PathBuf::from)
+        .or_else(|_| std::env::current_dir().map(|current| current.join("cache")))
+        .map_err(|err| anyhow::anyhow!("Failed to find launcher's cache folder: {err}"))?;
+
+    Ok(path.canonicalize().unwrap_or(path))
+}
+
+/// Get default launcher dir path.
+///
+/// If `LAUNCHER_FOLDER` variable is set, then its value will be returned.
+/// Otherwise returns `$HOME/.local/share/a-factory-game-launcher`.
+pub fn launcher_dir() -> anyhow::Result<PathBuf> {
+    std::env::var("LAUNCHER_FOLDER")
+        .map(PathBuf::from)
+        .or_else(|_| xdg_data_dir(APP_FOLDER_NAME))
+}
+
+/// Get launcher's cache dir path.
+///
+/// If `CACHE_FOLDER` variable is set, then its value will be returned.
+/// Otherwise returns `$HOME/.cache/a-factory-game-launcher`.
+pub fn cache_dir() -> anyhow::Result<PathBuf> {
+    std::env::var("CACHE_FOLDER")
+        .map(PathBuf::from)
+        .or_else(|_| xdg_cache_dir(APP_FOLDER_NAME))
+}
+
+fn ensure_sdk_paths() -> anyhow::Result<()> {
+    if std::env::var_os("LAUNCHER_FOLDER").is_none() {
+        std::env::set_var("LAUNCHER_FOLDER", launcher_dir()?);
+    }
+
+    if std::env::var_os("CACHE_FOLDER").is_none() {
+        std::env::set_var("CACHE_FOLDER", cache_dir()?);
+    }
+
+    Ok(())
+}
+
+fn rewrite_legacy_path(path: &mut PathBuf, legacy_base: &Path, current_base: &Path) -> bool {
+    let Ok(suffix) = path.strip_prefix(legacy_base) else {
+        return false;
+    };
+
+    let updated = current_base.join(suffix);
+
+    if *path == updated {
+        false
+    } else {
+        *path = updated;
+        true
+    }
+}
+
+fn normalize_config_paths(config: &mut Schema) -> anyhow::Result<bool> {
+    let current_launcher = launcher_dir()?;
+
+    let mut changed = false;
+
+    for legacy_name in LEGACY_APP_FOLDER_NAMES {
+        let legacy_launcher = xdg_data_dir(legacy_name)?;
+
+        changed |= rewrite_legacy_path(
+            &mut config.game.wine.prefix,
+            &legacy_launcher,
+            &current_launcher,
+        );
+        changed |= rewrite_legacy_path(
+            &mut config.game.wine.builds,
+            &legacy_launcher,
+            &current_launcher,
+        );
+        changed |= rewrite_legacy_path(
+            &mut config.game.dxvk.builds,
+            &legacy_launcher,
+            &current_launcher,
+        );
+        changed |= rewrite_legacy_path(
+            &mut config.game.path.global,
+            &legacy_launcher,
+            &current_launcher,
+        );
+        changed |= rewrite_legacy_path(
+            &mut config.game.path.china,
+            &legacy_launcher,
+            &current_launcher,
+        );
+        changed |= rewrite_legacy_path(
+            &mut config.components.path,
+            &legacy_launcher,
+            &current_launcher,
+        );
+        changed |= rewrite_legacy_path(
+            &mut config.game.enhancements.fps_unlocker.path,
+            &legacy_launcher,
+            &current_launcher,
+        );
+
+        if let Some(temp) = &mut config.launcher.temp {
+            changed |= rewrite_legacy_path(temp, &legacy_launcher, &current_launcher);
+        }
+    }
+
+    let default_game_dir = crate::factory_game::default_game_dir();
+
+    if crate::factory_game::is_default_genshin_path(&config.game.path.global) {
+        config.game.path.global = default_game_dir.clone();
+        changed = true;
+    }
+
+    if crate::factory_game::is_default_genshin_path(&config.game.path.china) {
+        config.game.path.china = default_game_dir;
+        changed = true;
+    }
+
+    if config
+        .game
+        .wine
+        .selected
+        .as_deref()
+        .is_none_or(|selected| selected.starts_with("spritz-wine-cachyos"))
+    {
+        config.game.wine.selected = Some(crate::factory_game::PREFERRED_WINE_VERSION.to_string());
+        changed = true;
+    }
+
+    Ok(changed)
+}
+
+fn load_config() -> anyhow::Result<Schema> {
+    let mut config = Config::get()?;
+
+    if normalize_config_paths(&mut config)? {
+        Config::update_raw(config.clone())?;
+    }
+
+    Ok(config)
 }
 
 lazy_static::lazy_static! {
     /// Config loaded on the app's start. Use `Config::get()` to get up to date config instead.
     /// This one is used to prepare some launcher UI components on start
-    pub static ref CONFIG: Schema = Config::get().expect("Failed to load config");
+    pub static ref CONFIG: Schema = load_config().expect("Failed to load config");
 
     pub static ref GAME: Game = Game::new(CONFIG.game.path.for_edition(CONFIG.launcher.edition), CONFIG.launcher.edition);
 
-    /// Path to launcher folder. Standard is `$HOME/.local/share/anime-game-launcher`
+    /// Path to launcher folder. Standard is `$HOME/.local/share/a-factory-game-launcher`
     pub static ref LAUNCHER_FOLDER: PathBuf = launcher_dir().expect("Failed to get launcher folder");
 
-    /// Path to launcher's cache folder. Standard is `$HOME/.cache/anime-game-launcher`
+    /// Path to launcher's cache folder. Standard is `$HOME/.cache/a-factory-game-launcher`
     pub static ref CACHE_FOLDER: PathBuf = cache_dir().expect("Failed to get launcher's cache folder");
 
-    /// Path to `debug.log` file. Standard is `$HOME/.local/share/anime-game-launcher/debug.log`
+    /// Path to `debug.log` file. Standard is `$HOME/.local/share/a-factory-game-launcher/debug.log`
     pub static ref DEBUG_FILE: PathBuf = LAUNCHER_FOLDER.join("debug.log");
 
-    /// Path to `background` file. Standard is `$HOME/.local/share/anime-game-launcher/background`
+    /// Path to `background` file. Standard is `$HOME/.local/share/a-factory-game-launcher/background`
     pub static ref BACKGROUND_FILE: PathBuf = LAUNCHER_FOLDER.join("background");
 
-    /// Path to `background-overlat` file. Standard is `$HOME/.local/share/anime-game-launcher/background-overlay`
+    /// Path to `background-overlat` file. Standard is `$HOME/.local/share/a-factory-game-launcher/background-overlay`
     pub static ref BACKGROUND_OVERLAY_FILE: PathBuf = LAUNCHER_FOLDER.join("background-overlay");
 
-    /// Path to the processed `background` file. Standard is `$HOME/.cache/anime-game-launcher/background`
+    /// Path to the processed `background` file. Standard is `$HOME/.cache/a-factory-game-launcher/background`
     pub static ref PROCESSED_BACKGROUND_FILE: PathBuf = CACHE_FOLDER.join("background");
 
-    /// Path to the processed `background-overlay` file. Standard is `$HOME/.cache/anime-game-launcher/background-overlay`
+    /// Path to the processed `background-overlay` file. Standard is `$HOME/.cache/a-factory-game-launcher/background-overlay`
     pub static ref PROCESSED_BACKGROUND_OVERLAY_FILE: PathBuf = CACHE_FOLDER.join("background-overlay");
 
-    /// Path to the processed `background-video` file. Standard is `$HOME/.cache/anime-game-launcher/background-video`
+    /// Path to the processed `background-video` file. Standard is `$HOME/.cache/a-factory-game-launcher/background-video`
     pub static ref BACKGROUND_VIDEO_FILE: PathBuf = CACHE_FOLDER.join("background-video");
 
     /// Path to `.keep-background` file. Used to mark launcher that it shouldn't update background picture
     ///
-    /// Standard is `$HOME/.local/share/anime-game-launcher/.keep-background`
+    /// Standard is `$HOME/.local/share/a-factory-game-launcher/.keep-background`
     pub static ref KEEP_BACKGROUND_FILE: PathBuf = LAUNCHER_FOLDER.join(".keep-background");
 
     /// Path to `.first-run` file. Used to mark launcher that it should run FirstRun window
     ///
-    /// Standard is `$HOME/.local/share/anime-game-launcher/.first-run`
+    /// Standard is `$HOME/.local/share/a-factory-game-launcher/.first-run`
     pub static ref FIRST_RUN_FILE: PathBuf = LAUNCHER_FOLDER.join(".first-run");
 
     /// Global app's css
@@ -134,6 +302,8 @@ lazy_static::lazy_static! {
 }
 
 fn main() -> anyhow::Result<()> {
+    ensure_sdk_paths()?;
+
     // Setup custom panic handler
     human_panic::setup_panic!(human_panic::metadata!());
 
@@ -207,7 +377,7 @@ fn main() -> anyhow::Result<()> {
                 }
             }
 
-            arg => gtk_args.push(arg.to_string())
+            arg => gtk_args.push(arg.to_string()),
         }
     }
 
@@ -273,8 +443,8 @@ fn main() -> anyhow::Result<()> {
     relm4::set_global_css(&GLOBAL_CSS);
 
     // Set application's title
-    gtk::glib::set_application_name("An Anime Game Launcher");
-    gtk::glib::set_program_name(Some("An Anime Game Launcher"));
+    gtk::glib::set_application_name("A Factory Game Launcher");
+    gtk::glib::set_program_name(Some("A Factory Game Launcher"));
 
     // Set UI language
     let lang = CONFIG
@@ -308,15 +478,13 @@ fn main() -> anyhow::Result<()> {
                     return Ok(());
                 }
 
-                LauncherState::PredownloadAvailable {
-                    ..
-                } if just_run_game => {
+                LauncherState::PredownloadAvailable { .. } if just_run_game => {
                     anime_launcher_sdk::genshin::game::run().expect("Failed to run the game");
 
                     return Ok(());
                 }
 
-                _ => ()
+                _ => (),
             }
         }
 

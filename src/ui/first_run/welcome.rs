@@ -9,7 +9,7 @@ pub struct WelcomeApp;
 
 #[derive(Debug, Clone)]
 pub enum WelcomeAppMsg {
-    Continue
+    Continue,
 }
 
 #[relm4::component(async, pub)]
@@ -32,7 +32,7 @@ impl SimpleAsyncComponent for WelcomeApp {
                 },
 
                 gtk::Label {
-                    set_label: "An Anime Game Launcher",
+                    set_label: "A Factory Game Launcher",
                     set_margin_top: 32,
                     add_css_class: "title-1"
                 },
@@ -69,15 +69,12 @@ impl SimpleAsyncComponent for WelcomeApp {
     async fn init(
         _init: Self::Init,
         root: Self::Root,
-        _sender: AsyncComponentSender<Self>
+        _sender: AsyncComponentSender<Self>,
     ) -> AsyncComponentParts<Self> {
         let model = Self;
         let widgets = view_output!();
 
-        AsyncComponentParts {
-            model,
-            widgets
-        }
+        AsyncComponentParts { model, widgets }
     }
 
     async fn update(&mut self, msg: Self::Input, sender: AsyncComponentSender<Self>) {

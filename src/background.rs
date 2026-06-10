@@ -1,20 +1,29 @@
 use std::path::Path;
 use std::process::Command;
+use std::time::Duration;
 
 use anime_launcher_sdk::anime_game_core::installer::downloader::Downloader;
-use anime_launcher_sdk::is_available;
-use anime_launcher_sdk::anime_game_core::minreq;
+use anime_launcher_sdk::anime_game_core::reqwest::blocking::Client;
 use anyhow::{Context, anyhow};
 use md5::{Digest, Md5};
+use serde::{Deserialize, Serialize};
 
-pub fn download_background(with_video: bool, _index: u8) -> anyhow::Result<()> {
+use anime_launcher_sdk::is_available;
+
+const GRYPHLINE_BATCH_PROXY_API: &str = "https://launcher.gryphline.com/api/proxy/web/batch_proxy";
+const PLATFORM: &str = "Windows";
+const SOURCE: &str = "launcher";
+
+pub fn download_background(with_video: bool, index: u8) -> anyhow::Result<()> {
     tracing::debug!("Downloading background picture");
 
     let backgrounds = get_background_info_multiple()?;
     #[allow(unused_parens, reason = "Clarity in the `find` condition")]
     let info = backgrounds
         .iter()
+        .skip(index as usize)
         .find(|bginfo| (!with_video || matches!(bginfo, BackgroundSpec::Video { .. })))
+        .or_else(|| backgrounds.get(index as usize))
         .or(backgrounds.first())
         .ok_or(anyhow!(
             "Failed to get background information: no backgrounds in the API"
@@ -27,25 +36,27 @@ pub fn download_background(with_video: bool, _index: u8) -> anyhow::Result<()> {
             std::fs::copy(&*crate::BACKGROUND_FILE, &*crate::PROCESSED_BACKGROUND_FILE)
                 .context("Copying background file")?;
             if matches!(info, BackgroundSpec::Video { .. }) {
-                std::fs::copy(
-                    &*crate::BACKGROUND_OVERLAY_FILE,
-                    &*crate::PROCESSED_BACKGROUND_OVERLAY_FILE
-                )
-                .context("Copying background overlay file")?;
+                if crate::BACKGROUND_OVERLAY_FILE.exists() {
+                    std::fs::copy(
+                        &*crate::BACKGROUND_OVERLAY_FILE,
+                        &*crate::PROCESSED_BACKGROUND_OVERLAY_FILE,
+                    )
+                    .context("Copying background overlay file")?;
+                }
             }
         } else {
             tracing::info!("WebP GDK Pixbuf Loader is not installed, converting images to PNG");
             info.convert_and_copy()?;
         }
-
-        if matches!(info, BackgroundSpec::Normal { .. }) {
-            // Remove the overlay and video file if it's normal variant
-            // Ignore error, if file is already missing for example
-            let _ = std::fs::remove_file(&*crate::PROCESSED_BACKGROUND_OVERLAY_FILE);
-            let _ = std::fs::remove_file(&*crate::BACKGROUND_VIDEO_FILE);
-        }
     } else {
         tracing::debug!("Not re-generating the background image, already latest")
+    }
+
+    if matches!(info, BackgroundSpec::Normal { .. }) {
+        // Remove the overlay and video file if it's normal variant.
+        // Ignore error, if file is already missing for example.
+        let _ = std::fs::remove_file(&*crate::PROCESSED_BACKGROUND_OVERLAY_FILE);
+        let _ = std::fs::remove_file(&*crate::BACKGROUND_VIDEO_FILE);
     }
 
     Ok(())
@@ -53,128 +64,81 @@ pub fn download_background(with_video: bool, _index: u8) -> anyhow::Result<()> {
 
 #[cached::proc_macro::cached(result)]
 pub fn get_background_info_multiple() -> anyhow::Result<Vec<BackgroundSpec>> {
-    let json = serde_json::from_slice::<serde_json::Value>(
-        minreq::get(get_uri()).with_timeout(15).send()?.as_bytes()
-    )?;
-
-    BackgroundSpec::from_json_all(&json)
+    let response = fetch_launcher_backgrounds()?;
+    BackgroundSpec::from_batch_proxy_response(&response)
 }
 
 #[cached::proc_macro::cached(result)]
 pub fn get_background_info(index: u8) -> anyhow::Result<BackgroundSpec> {
-    let json = serde_json::from_slice::<serde_json::Value>(
-        minreq::get(get_uri()).with_timeout(15).send()?.as_bytes()
-    )?;
+    let backgrounds = get_background_info_multiple()?;
 
-    BackgroundSpec::from_json_single(&json, index)
+    backgrounds
+        .get(index as usize)
+        .or_else(|| backgrounds.first())
+        .cloned()
+        .ok_or_else(|| anyhow::anyhow!("The API did not provide any backgrounds"))
 }
 
 pub fn get_uri() -> String {
-    let lang = crate::i18n::get_lang();
-
-    if lang.language == unic_langid::langid!("zh-cn").language {
-        concat!(
-            "https://hyp-api.",
-            "mi",
-            "ho",
-            "yo",
-            ".com/hyp/hyp-connect/api/getAllGameBasicInfo?launcher_id=jGHBHlcOq1"
-        )
-        .to_owned()
-    } else {
-        let uri = concat!(
-            "https://sg-hyp-api.",
-            "ho",
-            "yo",
-            "verse",
-            ".com/hyp/hyp-connect/api/getAllGameBasicInfo?launcher_id=VYTpXlbWo8&language="
-        );
-
-        uri.to_owned() + &crate::i18n::format_lang(lang)
-    }
+    GRYPHLINE_BATCH_PROXY_API.to_owned()
 }
 
 #[derive(Debug, Clone)]
 pub enum BackgroundSpec {
     Normal {
-        background: Background
+        background: Background,
     },
     Video {
         background: Background,
         video: Background,
-        overlay: Background
-    }
+        overlay: Option<Background>,
+    },
 }
 
 impl BackgroundSpec {
-    fn from_json_single(value: &serde_json::Value, index: u8) -> anyhow::Result<Self> {
-        let backgrounds_json = Self::backgrounds_json_from_value(value)?;
-        Self::from_json_value(
-            backgrounds_json
-                .get(index as usize)
-                .or_else(|| backgrounds_json.first())
-                .ok_or_else(|| anyhow::anyhow!("The API did not provide any backgrounds"))?
-        )
-    }
+    fn from_batch_proxy_response(response: &BatchProxyResponse) -> anyhow::Result<Vec<Self>> {
+        let main_image = response
+            .proxy_rsps
+            .iter()
+            .find(|rsp| rsp.kind == "get_main_bg_image")
+            .and_then(|rsp| rsp.get_main_bg_image_rsp.as_ref())
+            .and_then(|rsp| rsp.main_bg_image.as_ref())
+            .filter(|image| !image.url.is_empty());
 
-    fn from_json_all(value: &serde_json::Value) -> anyhow::Result<Vec<Self>> {
-        let backgrounds_json = Self::backgrounds_json_from_value(value)?;
+        let fallback_banner = response
+            .proxy_rsps
+            .iter()
+            .find(|rsp| rsp.kind == "get_banner")
+            .and_then(|rsp| rsp.get_banner_rsp.as_ref())
+            .and_then(|rsp| rsp.banners.iter().find(|banner| !banner.url.is_empty()));
 
-        backgrounds_json.iter().map(Self::from_json_value).collect()
-    }
-
-    fn backgrounds_json_from_value(
-        value: &serde_json::Value
-    ) -> anyhow::Result<&Vec<serde_json::Value>> {
-        value["data"]["game_info_list"]
-                .as_array()
-                .ok_or_else(|| anyhow::anyhow!("Failed to list games in the backgrounds API"))?
-                .iter()
-                .find(|game| match game["game"]["biz"].as_str() {
-                    Some(biz) => biz.starts_with("hk4e_"),
-                    _ => false
-                })
-                .ok_or_else(|| anyhow::anyhow!("Failed to find the game in the backgrounds API"))?
-                ["backgrounds"]
-                .as_array()
-                .ok_or_else(|| {
-                    anyhow::anyhow!(
-                        "Failed to parse backgrounds API: `backgrounds` is not an array"
-                    )
-                })
-    }
-
-    fn from_json_value(value: &serde_json::Value) -> anyhow::Result<Self> {
-        let background_uri = get_img_uri_from_json_value(Some(value), "background")?;
-        let background = Background::from_uri(background_uri);
-
-        if value["type"].as_str() == Some("BACKGROUND_TYPE_VIDEO") {
-            let video_uri = get_img_uri_from_json_value(Some(value), "video")?;
-            let video = Background::from_uri(video_uri);
-
-            let overlay_uri = get_img_uri_from_json_value(Some(value), "theme")?;
-            let overlay = Background::from_uri(overlay_uri);
-
-            Ok(Self::Video {
-                background,
-                video,
-                overlay
-            })
+        let background = if let Some(main_image) = main_image {
+            Background::from_uri_with_hash(main_image.url.clone(), main_image.md5.clone())?
+        } else if let Some(fallback_banner) = fallback_banner {
+            Background::from_uri_with_hash(
+                fallback_banner.url.clone(),
+                fallback_banner.md5.clone(),
+            )?
         } else {
-            Ok(Self::Normal {
-                background
-            })
+            anyhow::bail!("GRYPHLINK API did not provide main background or banners");
+        };
+
+        if let Some(video_url) =
+            main_image.and_then(|image| image.video_url.as_deref().filter(|url| !url.is_empty()))
+        {
+            Ok(vec![Self::Video {
+                background,
+                video: Background::from_uri(video_url.to_string())?,
+                overlay: None,
+            }])
+        } else {
+            Ok(vec![Self::Normal { background }])
         }
     }
 
     fn background(&self) -> &Background {
         match self {
-            Self::Normal {
-                background
-            }
-            | Self::Video {
-                background, ..
-            } => background
+            Self::Normal { background } | Self::Video { background, .. } => background,
         }
     }
 
@@ -184,13 +148,13 @@ impl BackgroundSpec {
 
         regenerate_image |= self.background().download(&crate::BACKGROUND_FILE)?;
 
-        if let Self::Video {
-            video,
-            overlay,
-            ..
-        } = self
-        {
-            regenerate_image |= overlay.download(&crate::BACKGROUND_OVERLAY_FILE)?;
+        if let Self::Video { video, overlay, .. } = self {
+            if let Some(overlay) = overlay {
+                regenerate_image |= overlay.download(&crate::BACKGROUND_OVERLAY_FILE)?;
+            } else {
+                let _ = std::fs::remove_file(&*crate::BACKGROUND_OVERLAY_FILE);
+                let _ = std::fs::remove_file(&*crate::PROCESSED_BACKGROUND_OVERLAY_FILE);
+            }
             if with_video {
                 regenerate_image |= video.download(&crate::BACKGROUND_VIDEO_FILE)?;
             }
@@ -203,17 +167,16 @@ impl BackgroundSpec {
         finalize_file(
             self.background(),
             &crate::BACKGROUND_FILE,
-            &crate::PROCESSED_BACKGROUND_FILE
+            &crate::PROCESSED_BACKGROUND_FILE,
         )?;
-        if let Self::Video {
-            overlay, ..
-        } = self
-        {
-            finalize_file(
-                overlay,
-                &crate::BACKGROUND_OVERLAY_FILE,
-                &crate::PROCESSED_BACKGROUND_OVERLAY_FILE
-            )?;
+        if let Self::Video { overlay, .. } = self {
+            if let Some(overlay) = overlay {
+                finalize_file(
+                    overlay,
+                    &crate::BACKGROUND_OVERLAY_FILE,
+                    &crate::PROCESSED_BACKGROUND_OVERLAY_FILE,
+                )?;
+            }
         }
         Ok(())
     }
@@ -257,22 +220,31 @@ fn convert_image(from: &Path, to: &Path) -> anyhow::Result<()> {
 #[derive(Debug, Clone)]
 pub struct Background {
     pub uri: String,
-    pub hash: String
+    pub hash: Option<String>,
 }
 
 impl Background {
-    fn from_uri(uri: String) -> Self {
-        let hash = get_img_hash_from_uri(&uri);
-        Self {
+    fn from_uri(uri: String) -> anyhow::Result<Self> {
+        Self::from_uri_with_hash(uri, None)
+    }
+
+    fn from_uri_with_hash(uri: String, hash: Option<String>) -> anyhow::Result<Self> {
+        anyhow::ensure!(
+            !uri.is_empty(),
+            "GRYPHLINK API returned an empty background URL"
+        );
+
+        Ok(Self {
+            hash: hash.or_else(|| get_img_hash_from_uri(&uri)),
             uri,
-            hash
-        }
+        })
     }
 
     /// Return true if the background needs to be re-generated
     fn download(&self, path: &Path) -> anyhow::Result<bool> {
-        if !check_img_file(path, &self.hash)? {
+        if !check_img_file(path, self.hash.as_deref(), &self.uri)? {
             download_img_file(path, &self.uri)?;
+            write_img_uri_cache(path, &self.uri)?;
             return Ok(true);
         }
         Ok(false)
@@ -280,11 +252,20 @@ impl Background {
 }
 
 /// Returns true if image exists and is correct
-fn check_img_file(path: &Path, expected_hash: &str) -> anyhow::Result<bool> {
+fn check_img_file(path: &Path, expected_hash: Option<&str>, uri: &str) -> anyhow::Result<bool> {
     if path.exists() {
-        let hash = Md5::digest(std::fs::read(path)?);
+        if let Some(expected_hash) = expected_hash {
+            let hash = Md5::digest(std::fs::read(path)?);
 
-        if format!("{hash:x}").eq_ignore_ascii_case(expected_hash) {
+            if format!("{hash:x}").eq_ignore_ascii_case(expected_hash) {
+                tracing::debug!("Background picture {path:?} already downloaded. Skipping");
+
+                return Ok(true);
+            }
+        } else if std::fs::read_to_string(img_uri_cache_path(path))
+            .map(|cached_uri| cached_uri.trim() == uri)
+            .unwrap_or(false)
+        {
             tracing::debug!("Background picture {path:?} already downloaded. Skipping");
 
             return Ok(true);
@@ -294,24 +275,16 @@ fn check_img_file(path: &Path, expected_hash: &str) -> anyhow::Result<bool> {
     Ok(false)
 }
 
-fn get_img_uri_from_json_value(
-    backgrounds_info: Option<&serde_json::Value>,
-    key: &str
-) -> anyhow::Result<String> {
-    Ok(backgrounds_info
-        .and_then(|background| background[key]["url"].as_str())
-        .ok_or_else(|| anyhow::anyhow!("Failed to get background picture url"))?
-        .to_string())
-}
-
-fn get_img_hash_from_uri(uri: &str) -> String {
-    uri.split('/')
+fn get_img_hash_from_uri(uri: &str) -> Option<String> {
+    let hash = uri
+        .split('/')
         .next_back()
         .unwrap_or_default()
-        .split('_')
+        .split(['_', '.'])
         .next()
-        .unwrap_or_default()
-        .to_owned()
+        .unwrap_or_default();
+
+    (hash.len() == 32 && hash.chars().all(|ch| ch.is_ascii_hexdigit())).then(|| hash.to_owned())
 }
 
 #[cached::proc_macro::once()]
@@ -339,4 +312,121 @@ fn download_img_file(path: &Path, uri: &str) -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+fn img_uri_cache_path(path: &Path) -> std::path::PathBuf {
+    path.with_extension("url")
+}
+
+fn write_img_uri_cache(path: &Path, uri: &str) -> anyhow::Result<()> {
+    std::fs::write(img_uri_cache_path(path), uri).context("Writing background URL cache")
+}
+
+fn fetch_launcher_backgrounds() -> anyhow::Result<BatchProxyResponse> {
+    let lang = crate::i18n::format_lang(crate::i18n::get_lang());
+    let client = Client::builder()
+        .timeout(Duration::from_secs(15))
+        .build()
+        .context("Failed to create GRYPHLINK API client")?;
+
+    client
+        .post(GRYPHLINE_BATCH_PROXY_API)
+        .json(&BatchProxyRequest::main_background(lang))
+        .send()
+        .context("Failed to request GRYPHLINK launcher background")?
+        .error_for_status()
+        .context("GRYPHLINK launcher background API returned an error")?
+        .json()
+        .context("Failed to decode GRYPHLINK launcher background response")
+}
+
+#[derive(Debug, Serialize)]
+struct BatchProxyRequest {
+    proxy_reqs: Vec<ProxyRequest>,
+}
+
+impl BatchProxyRequest {
+    fn main_background(language: String) -> Self {
+        Self {
+            proxy_reqs: vec![
+                ProxyRequest {
+                    kind: "get_main_bg_image",
+                    get_main_bg_image_req: Some(MainBackgroundRequest::new(language.clone())),
+                    get_banner_req: None,
+                },
+                ProxyRequest {
+                    kind: "get_banner",
+                    get_main_bg_image_req: None,
+                    get_banner_req: Some(MainBackgroundRequest::new(language)),
+                },
+            ],
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+struct ProxyRequest {
+    kind: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    get_main_bg_image_req: Option<MainBackgroundRequest>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    get_banner_req: Option<MainBackgroundRequest>,
+}
+
+#[derive(Debug, Serialize)]
+struct MainBackgroundRequest {
+    appcode: &'static str,
+    language: String,
+    channel: &'static str,
+    sub_channel: &'static str,
+    platform: &'static str,
+    source: &'static str,
+}
+
+impl MainBackgroundRequest {
+    fn new(language: String) -> Self {
+        Self {
+            appcode: crate::factory_game::GAME_APP_CODE,
+            language,
+            channel: crate::factory_game::CHANNEL,
+            sub_channel: crate::factory_game::SUB_CHANNEL,
+            platform: PLATFORM,
+            source: SOURCE,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct BatchProxyResponse {
+    proxy_rsps: Vec<ProxyResponse>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ProxyResponse {
+    kind: String,
+    get_main_bg_image_rsp: Option<MainBackgroundResponse>,
+    get_banner_rsp: Option<BannerResponse>,
+}
+
+#[derive(Debug, Deserialize)]
+struct MainBackgroundResponse {
+    main_bg_image: Option<MainBackgroundImage>,
+}
+
+#[derive(Debug, Deserialize)]
+struct MainBackgroundImage {
+    url: String,
+    md5: Option<String>,
+    video_url: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct BannerResponse {
+    banners: Vec<BannerImage>,
+}
+
+#[derive(Debug, Deserialize)]
+struct BannerImage {
+    url: String,
+    md5: Option<String>,
 }

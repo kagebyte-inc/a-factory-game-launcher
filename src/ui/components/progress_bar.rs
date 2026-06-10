@@ -16,7 +16,7 @@ pub struct ProgressBarInit {
     /// Add `(XX MB of YY MB)` suffix
     pub display_fraction: bool,
 
-    pub visible: bool
+    pub visible: bool,
 }
 
 pub struct ProgressBar {
@@ -32,7 +32,7 @@ pub struct ProgressBar {
     /// Add `(XX MB of YY MB)` suffix
     pub display_fraction: bool,
 
-    pub visible: bool
+    pub visible: bool,
 }
 
 #[derive(Debug)]
@@ -49,7 +49,7 @@ pub enum ProgressBarMsg {
     UpdateProgressCounter(u64, u64),
 
     UpdateFromState(DiffUpdate),
-    SetVisible(bool)
+    SetVisible(bool),
 }
 
 #[relm4::component(async, pub)]
@@ -95,7 +95,7 @@ impl SimpleAsyncComponent for ProgressBar {
     async fn init(
         init: Self::Init,
         root: Self::Root,
-        _sender: AsyncComponentSender<Self>
+        _sender: AsyncComponentSender<Self>,
     ) -> AsyncComponentParts<Self> {
         let model = ProgressBar {
             fraction: 0.0,
@@ -103,15 +103,12 @@ impl SimpleAsyncComponent for ProgressBar {
             downloaded: None,
             display_progress: init.display_progress,
             display_fraction: init.display_fraction,
-            visible: init.visible
+            visible: init.visible,
         };
 
         let widgets = view_output!();
 
-        AsyncComponentParts {
-            model,
-            widgets
-        }
+        AsyncComponentParts { model, widgets }
     }
 
     async fn update(&mut self, msg: Self::Input, _sender: AsyncComponentSender<Self>) {
@@ -145,7 +142,7 @@ impl SimpleAsyncComponent for ProgressBar {
                     | DiffUpdate::InstallerUpdate(InstallerUpdate::CheckingFreeSpace(_))
                     | DiffUpdate::SophonPatcherUpdate(SophonPatcherUpdate::CheckingFreeSpace(_))
                     | DiffUpdate::SophonInstallerUpdate(
-                        SophonInstallerUpdate::CheckingFreeSpace(_)
+                        SophonInstallerUpdate::CheckingFreeSpace(_),
                     ) => self.caption = Some(tr!("checking-free-space")),
 
                     // checking files before download/update
@@ -158,10 +155,7 @@ impl SimpleAsyncComponent for ProgressBar {
                     }
 
                     DiffUpdate::SophonInstallerUpdate(
-                        SophonInstallerUpdate::CheckingFilesProgress {
-                            passed,
-                            total
-                        }
+                        SophonInstallerUpdate::CheckingFilesProgress { passed, total },
                     ) => {
                         self.fraction = passed as f64 / total as f64;
                     }
@@ -170,9 +164,7 @@ impl SimpleAsyncComponent for ProgressBar {
                     DiffUpdate::InstallerUpdate(InstallerUpdate::DownloadingStarted(_))
                     | DiffUpdate::SophonPatcherUpdate(SophonPatcherUpdate::DownloadingStarted(_))
                     | DiffUpdate::SophonInstallerUpdate(
-                        SophonInstallerUpdate::DownloadingStarted {
-                            ..
-                        }
+                        SophonInstallerUpdate::DownloadingStarted { .. },
                     ) => {
                         self.caption = Some(tr!("downloading"));
                         self.display_fraction = true;
@@ -208,15 +200,15 @@ impl SimpleAsyncComponent for ProgressBar {
 
                     DiffUpdate::InstallerUpdate(InstallerUpdate::DownloadingProgress(
                         curr,
-                        total
+                        total,
                     ))
                     | DiffUpdate::InstallerUpdate(InstallerUpdate::UpdatingPermissions(
                         curr,
-                        total
+                        total,
                     ))
                     | DiffUpdate::InstallerUpdate(InstallerUpdate::UnpackingProgress(
                         curr,
-                        total
+                        total,
                     ))
                     | DiffUpdate::ApplyingHdiffProgress(curr, total)
                     | DiffUpdate::RemovingOutdatedProgress(curr, total) => {
@@ -255,7 +247,7 @@ impl SimpleAsyncComponent for ProgressBar {
                     // downloading finish
                     DiffUpdate::InstallerUpdate(InstallerUpdate::DownloadingFinished)
                     | DiffUpdate::SophonInstallerUpdate(
-                        SophonInstallerUpdate::DownloadingFinished
+                        SophonInstallerUpdate::DownloadingFinished,
                     )
                     | DiffUpdate::SophonPatcherUpdate(SophonPatcherUpdate::DownloadingFinished) => {
                         tracing::info!("Downloading finished")
@@ -263,7 +255,7 @@ impl SimpleAsyncComponent for ProgressBar {
 
                     // downloading errors
                     DiffUpdate::SophonInstallerUpdate(SophonInstallerUpdate::DownloadingError(
-                        err
+                        err,
                     ))
                     | DiffUpdate::SophonPatcherUpdate(SophonPatcherUpdate::DownloadingError(err)) =>
                     {
@@ -271,21 +263,21 @@ impl SimpleAsyncComponent for ProgressBar {
                     }
                     // file hash check errors
                     DiffUpdate::SophonPatcherUpdate(SophonPatcherUpdate::FileHashCheckFailed(
-                        path
+                        path,
                     )) => tracing::error!("File hash check failed on {path:?}"),
 
                     // sophon download progress reports
                     DiffUpdate::SophonInstallerUpdate(
                         SophonInstallerUpdate::DownloadingProgressBytes {
                             downloaded_bytes,
-                            total_bytes
-                        }
+                            total_bytes,
+                        },
                     )
                     | DiffUpdate::SophonPatcherUpdate(
                         SophonPatcherUpdate::DownloadingProgressBytes {
                             downloaded_bytes,
-                            total_bytes
-                        }
+                            total_bytes,
+                        },
                     ) => {
                         tracing::debug!("Download progress [{downloaded_bytes}/{total_bytes}]");
 
@@ -293,31 +285,31 @@ impl SimpleAsyncComponent for ProgressBar {
 
                         self.downloaded = Some((
                             prettify_bytes(downloaded_bytes),
-                            prettify_bytes(total_bytes)
+                            prettify_bytes(total_bytes),
                         ));
                     }
 
                     // rest of sophon progress updates
                     DiffUpdate::SophonPatcherUpdate(SophonPatcherUpdate::DeletingProgress {
                         deleted_files,
-                        total_unused
+                        total_unused,
                     }) => tracing::debug!(
                         "Deleted {deleted_files} unused files out of {total_unused}"
                     ),
                     DiffUpdate::SophonInstallerUpdate(
                         SophonInstallerUpdate::DownloadingProgressFiles {
                             downloaded_files,
-                            total_files
-                        }
+                            total_files,
+                        },
                     ) => tracing::info!("Downloaded {downloaded_files} files out of {total_files}"),
                     DiffUpdate::SophonPatcherUpdate(SophonPatcherUpdate::PatchingProgress {
                         patched_files,
-                        total_files
-                    }) => tracing::info!("Patched {patched_files} files out of {total_files}")
+                        total_files,
+                    }) => tracing::info!("Patched {patched_files} files out of {total_files}"),
                 }
             }
 
-            ProgressBarMsg::SetVisible(visible) => self.visible = visible
+            ProgressBarMsg::SetVisible(visible) => self.visible = visible,
         }
     }
 }
